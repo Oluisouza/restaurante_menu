@@ -82,11 +82,11 @@ class Comanda(models.Model):
 
     def clean(self):
         if self.tipo == self.Tipo.MESA and not self.mesa:
-            raise validationError({'mesa': 'Comanda de mesa precisa ter uma mesa associada.'})
+            raise ValidationError({'mesa': 'Comanda de mesa precisa ter uma mesa associada.'})
         if self.tipo != self.Tipo.MESA and self.mesa:
-            raise validationError({'mesa': 'Comanda de viagem ou balcão não pode ter uma mesa associada.'})
+            raise ValidationError({'mesa': 'Comanda de viagem ou balcão não pode ter uma mesa associada.'})
         if self.desconto < 0:
-            raise validationError({'desconto': 'Desconto não pode ser negativo.'})
+            raise ValidationError({'desconto': 'Desconto não pode ser negativo.'})
 
     def save(self, *args, **kwargs):
         if not self.codigo:
@@ -102,7 +102,7 @@ class Comanda(models.Model):
 
     @property
     def subtotal(self):
-        return sum((item.subtotal for item in self.itens_validos), Decimal('0.00'))
+        return sum((item.total for item in self.itens_validos), Decimal('0.00'))
 
     @property
     def valor_taxa_servico(self):
@@ -120,9 +120,9 @@ class Comanda(models.Model):
 
     def fechar(self, forma_pagamento):
         if not self.esta_aberta:
-            raise validationError('Comanda já está fechada ou cancelada.')
+            raise ValidationError('Comanda já está fechada ou cancelada.')
         if not self.itens_validos.exists():
-            raise validationError('Comanda não pode ser fechada sem itens válidos.')
+            raise ValidationError('Comanda não pode ser fechada sem itens válidos.')
 
         self.forma_pagamento = forma_pagamento
         self.total_pago = self.total
@@ -132,7 +132,7 @@ class Comanda(models.Model):
 
     def cancelar(self):
         if not self.esta_aberta:
-            raise validationError('Comanda já está fechada ou cancelada.')
+            raise ValidationError('Comanda já está fechada ou cancelada.')
         self.status = self.Status.CANCELADA
         self.fechada_em = timezone.now()
         self.save()
@@ -164,7 +164,7 @@ class ItemComanda(models.Model):
         null=True,
     )
     quantidade = models.PositiveIntegerField(default=1)
-    preco_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     observacao = models.CharField(max_length=200, blank=True)
 
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDENTE)
@@ -205,7 +205,7 @@ class ItemComanda(models.Model):
 
     def clean(self):
         if bool(self.prato) == bool(self.combo):
-            raise validationError('Informe exatamente um: prato ou combo.')
+            raise ValidationError('Informe exatamente um: prato ou combo.')
 
     def save(self, *args, **kwargs):
         if self.preco_unitario is None and self.produto:
@@ -222,7 +222,7 @@ class ItemAdicional(models.Model):
         Prato,
         on_delete=models.PROTECT,
     )
-    preco_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     class Meta:
         verbose_name = 'adicional'
