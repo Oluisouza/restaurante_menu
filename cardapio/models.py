@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.functions import Lower
 
 class Categoria(models.Model):
     nome = models.CharField(max_length=100, unique=True)
@@ -9,6 +10,17 @@ class Categoria(models.Model):
         verbose_name = "Categoria"
         verbose_name_plural = "Categorias"
         ordering = ['ordem', 'nome']
+        constraints = [
+            models.UniqueConstraint(
+                Lower('nome'),
+                name='categoria_nome_unico_ci',
+                violation_error_message='Já existe uma categoria com esse nome.',
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        self.nome = self.nome.strip()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nome
@@ -30,6 +42,17 @@ class Prato(models.Model):
         verbose_name = "item do cardápio"
         verbose_name_plural = "itens do cardápio"
         ordering = ['categoria__ordem', 'nome']
+        constraints = [
+            models.UniqueConstraint(
+                Lower('nome'),
+                name='prato_nome_unico_ci',
+                violation_error_message='Já existe um item do cardápio com esse nome.',
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.nome = self.nome.strip()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.nome} - R$ {self.preco}'
