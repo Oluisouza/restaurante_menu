@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Salão — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Salão</h2>
+<p>{{ total_abertas }} comanda{{ total_abertas|pluralize }} aberta{{ total_abertas|pluralize }}.</p>
+
+<h3>Mesas</h3>
+<div class="grade">
+    {% for mesa in mesas %}
+        <a class="cartao {% if mesa.ocupada %}ocupada{% else %}livre{% endif %}"
+           href="{% url 'atendimento:detalhe_mesa' mesa.pk %}">
+            <strong>{{ mesa }}</strong><br>
+            <small>{{ mesa.capacidade }} lugares</small>
+            {% for comanda in mesa.comandas_abertas %}
+                <div><small>{{ comanda.responsavel|default:"sem nome" }} — R$ {{ comanda.total|floatformat:2 }}</small></div>
+            {% empty %}
+                <div><small style="color:#5c8a3a">livre</small></div>
+            {% endfor %}
+        </a>
+    {% endfor %}
+</div>
+
+<h3>Viagem e balcão</h3>
+{% if avulsas %}
+<table>
+    <tr><th>Código</th><th>Tipo</th><th>Responsável</th><th class="direita">Total</th></tr>
+    {% for comanda in avulsas %}
+    <tr>
+        <td><a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">{{ comanda.codigo }}</a></td>
+        <td>{{ comanda.get_tipo_display }}</td>
+        <td>{{ comanda.responsavel|default:"—" }}</td>
+        <td class="direita">R$ {{ comanda.total|floatformat:2 }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="vazio">Nenhum pedido de viagem em aberto.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Comandas — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Comandas</h2>
+
+<form class="filtros" method="get">
+    <select name="status">
+        <option value="">Todos os status</option>
+        {% for valor, rotulo in status_opcoes %}
+            <option value="{{ valor }}" {% if valor == status_selecionado %}selected{% endif %}>{{ rotulo }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Filtrar</button>
+</form>
+
+<table>
+    <tr><th>Código</th><th>Tipo</th><th>Mesa</th><th>Responsável</th><th>Status</th><th class="direita">Total</th></tr>
+    {% for comanda in comandas %}
+    <tr>
+        <td><a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">{{ comanda.codigo }}</a></td>
+        <td>{{ comanda.get_tipo_display }}</td>
+        <td>{{ comanda.mesa|default:"—" }}</td>
+        <td>{{ comanda.responsavel|default:"—" }}</td>
+        <td><span class="etiqueta {{ comanda.status }}">{{ comanda.get_status_display }}</span></td>
+        <td class="direita">R$ {{ comanda.total|floatformat:2 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="vazio">Nenhuma comanda encontrada.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block titulo %}{{ mesa }} — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>{{ mesa }}</h2>
+<p>{{ mesa.capacidade }} lugares ·
+   {% if mesa.ocupada %}<strong>ocupada</strong>{% else %}livre{% endif %}</p>
+
+<h3>Comandas</h3>
+<table>
+    <tr><th>Código</th><th>Responsável</th><th>Status</th><th>Aberta em</th><th class="direita">Total</th></tr>
+    {% for comanda in comandas %}
+    <tr>
+        <td><a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">{{ comanda.codigo }}</a></td>
+        <td>{{ comanda.responsavel|default:"—" }}</td>
+        <td><span class="etiqueta {{ comanda.status }}">{{ comanda.get_status_display }}</span></td>
+        <td>{{ comanda.aberta_em|date:"d/m H:i" }}</td>
+        <td class="direita">R$ {{ comanda.total|floatformat:2 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="vazio">Nenhuma comanda nesta mesa.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}

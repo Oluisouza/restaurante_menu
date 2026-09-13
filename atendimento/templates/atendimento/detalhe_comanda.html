@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block titulo %}{{ comanda.codigo }} — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>{{ comanda.codigo }}
+    <span class="etiqueta {{ comanda.status }}">{{ comanda.get_status_display }}</span>
+</h2>
+<p>
+    {{ comanda.get_tipo_display }}
+    {% if comanda.mesa %}— {{ comanda.mesa }}{% endif %}
+    — {{ comanda.responsavel|default:"sem nome" }}
+</p>
+<p><small>Aberta em {{ comanda.aberta_em|date:"d/m/Y H:i" }}
+{% if comanda.fechada_em %}· Fechada em {{ comanda.fechada_em|date:"d/m/Y H:i" }}{% endif %}</small></p>
+
+<h3>Itens</h3>
+<table>
+    <tr>
+        <th>Item</th><th>Obs.</th><th class="direita">Qtd</th>
+        <th class="direita">Unit.</th><th class="direita">Total</th><th>Status</th>
+    </tr>
+    {% for item in itens %}
+    <tr>
+        <td>
+            {{ item.descricao_produto }}
+            {% for adicional in item.adicionais.all %}
+                <br><small>+ {{ adicional.prato.nome }} (R$ {{ adicional.preco_unitario|floatformat:2 }})</small>
+            {% endfor %}
+        </td>
+        <td><small>{{ item.observacao|default:"—" }}</small></td>
+        <td class="direita">{{ item.quantidade }}</td>
+        <td class="direita">R$ {{ item.preco_unitario|floatformat:2 }}</td>
+        <td class="direita">R$ {{ item.total|floatformat:2 }}</td>
+        <td><span class="etiqueta {{ item.status }}">{{ item.get_status_display }}</span></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="vazio">Nenhum item lançado ainda.</td></tr>
+    {% endfor %}
+</table>
+
+<div class="totais">
+    <div><span>Subtotal</span><span>R$ {{ comanda.subtotal|floatformat:2 }}</span></div>
+    {% if comanda.taxa_servico %}
+    <div><span>Taxa de serviço (10%)</span><span>R$ {{ comanda.valor_taxa_servico|floatformat:2 }}</span></div>
+    {% endif %}
+    {% if comanda.desconto %}
+    <div><span>Desconto</span><span>− R$ {{ comanda.desconto|floatformat:2 }}</span></div>
+    {% endif %}
+    <div class="final"><span>Total</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
+</div>
+{% endblock %}
