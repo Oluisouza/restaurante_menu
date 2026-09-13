@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Cardápio — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Cardápio</h2>
+
+<form class="filtros" method="get">
+    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar item...">
+    <button type="submit">Buscar</button>
+</form>
+
+{% for categoria in categorias %}
+    <h3>{{ categoria.nome }}</h3>
+    <table>
+        {% for prato in pratos %}
+            {% if prato.categoria_id == categoria.id %}
+            <tr>
+                <td>
+                    <strong>{{ prato.nome }}</strong>
+                    {% if prato.descricao %}<br><small>{{ prato.descricao }}</small>{% endif %}
+                </td>
+                <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
+            </tr>
+            {% endif %}
+        {% endfor %}
+    </table>
+{% endfor %}
+
+<h3>Combos</h3>
+<div class="grade">
+    {% for combo in combos %}
+    <div class="cartao">
+        <strong>{{ combo.nome }}</strong><br>
+        <small>
+            {% for item in combo.itens.all %}{{ item.quantidade }}× {{ item.prato.nome }}<br>{% endfor %}
+        </small>
+        <p>R$ {{ combo.preco|floatformat:2 }}
+           <small style="color:#5c8a3a">(economia de R$ {{ combo.economia|floatformat:2 }})</small></p>
+    </div>
+    {% empty %}
+    <p class="vazio">Nenhum combo cadastrado.</p>
+    {% endfor %}
+</div>
+{% endblock %}
