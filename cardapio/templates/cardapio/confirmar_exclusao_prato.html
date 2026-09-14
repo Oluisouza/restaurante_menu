@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Excluir {{ prato.nome }}{% endblock %}
+
+{% block conteudo %}
+<h2>Excluir item do cardápio</h2>
+
+<div class="form-box">
+    <p>
+        Excluir <strong>{{ prato.nome }}</strong>
+        ({{ prato.categoria.nome }} · R$ {{ prato.preco|floatformat:2 }}) do cardápio?
+    </p>
+    <p>
+        Se o item já foi vendido ou faz parte de um combo, o sistema vai recusar.
+        Nesse caso, prefira <a href="{% url 'cardapio:editar_prato' prato.pk %}">marcá-lo como indisponível</a>.
+    </p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="acoes">
+            <button type="submit" class="botao">Sim, excluir</button>
+            <a href="{% url 'cardapio:lista_pratos' %}" class="botao claro">Voltar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
