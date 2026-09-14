@@ -48,6 +48,24 @@
         form.filtros { margin-bottom: 1rem; display: flex; gap: .5rem; }
         input, select, button { padding: .5rem; font: inherit; border: 1px solid #cfc6ba; border-radius: 4px; }
         button { background: #3d2b1f; color: #fff; border: none; cursor: pointer; }
+
+        .avisos { list-style: none; margin-bottom: 1rem; }
+        .avisos li { padding: .7rem 1rem; border-radius: 6px; margin-bottom: .5rem; }
+        .avisos .success { background: #d9ead0; color: #2c4a19; }
+        .avisos .error { background: #f6d5cf; color: #7a2413; }
+        .avisos .warning { background: #fdeecb; color: #7a5500; }
+        .avisos .info { background: #d9e6f5; color: #1f4b7a; }
+        .botao { display: inline-block; background: #3d2b1f; color: #fff; padding: .55rem 1rem; border-radius: 5px; text-decoration: none; font-size: .9rem; }
+        .botao:hover { background: #5a3f2e; }
+        .botao.claro { background: #b08968; }
+        .acoes { display: flex; gap: .75rem; margin: 1rem 0; flex-wrap: wrap; }
+        .form-box { background: #fff; padding: 1.5rem; border-radius: 8px; max-width: 560px; }
+        .form-box p { margin-bottom: 1rem; }
+        .form-box label { display: block; font-weight: 600; margin-bottom: .25rem; font-size: .9rem; }
+        .form-box input, .form-box select { width: 100%; }
+        .form-box input[type="checkbox"] { width: auto; }
+        .form-box .helptext { display: block; font-size: .8rem; color: #8a7f75; margin-top: .2rem; }
+        .form-box ul.errorlist { list-style: none; color: #a52c14; font-size: .85rem; margin-bottom: .3rem; }
     </style>
 </head>
 <body>
@@ -62,6 +80,14 @@
     </header>
 
     <main>
+        {% if messages %}
+        <ul class="avisos">
+            {% for mensagem in messages %}
+                <li class="{{ mensagem.tags }}">{{ mensagem }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        
         {% block conteudo %}{% endblock %}
     </main>
 </body>
