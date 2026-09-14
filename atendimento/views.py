@@ -1,8 +1,9 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, render, redirect
 
-from .forms import ComandaForm, ItemComandaForm
-from .models import Comanda, Mesa
+from .forms import ComandaForm, ItemComandaForm, FechamentoForm
+from .models import Comanda, Mesa, ItemComanda
 
 def salao(request):
     mesas = Mesa.objects.filter(ativa=True)
@@ -70,3 +71,48 @@ def lancar_item(request, pk):
         'itens': comanda.itens.select_related('prato', 'combo'),
     }
     return render(request, 'atendimento/form_item.html', contexto)
+
+def fechar_comanda(request, pk):
+    comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
+
+    if not comanda.esta_aberta:
+        messages.warning(request, f'A comanda {comanda.codigo} já foi encerrada.')
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+
+    if request.method == 'POST':
+        form = FechamentoForm(request.POST, instance=comanda)
+        if form.is_valid():
+            comanda = form.save(commit=False)
+            try:
+                comanda.fechar()
+            except ValidationError as erro:
+                form.add_error(None, erro)
+            else:
+                messages.success(request, f'Comanda {comanda.codigo} fechada - R$ {comanda.total_pago:.2f}.')
+                return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+    else: 
+        form = FechamentoForm(instance=comanda)
+
+    nao_entregues = comanda.itens_validos.exclude(status=ItemComanda.Status.ENTREGUE).count()
+
+    contexto = {
+        'comanda': comanda,
+        'form': form,
+        'itens': comanda.itens_validos.select_related('prato', 'combo'),
+        'nao_entregues': nao_entregues,
+    }
+    return render(request, 'atendimento/fechar_comanda.html', contexto)
+
+def cancelar_comanda(request, pk):
+    comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
+
+    if request.method == 'POST':
+        try:
+            comanda.cancelar()
+        except ValidationError as erro:
+            messages.error(request, '; '.join(erro.messages))
+        else:
+            messages.success(request, f'Comanda {comanda.codigo} cancelada.')
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+
+    return render(request, 'atendimento/confirmar_cancelamento.html', {'comanda': comanda})

@@ -9,6 +9,8 @@
 {% if comanda.esta_aberta %}
 <div class="acoes">
     <a href="{% url 'atendimento:lancar_item' comanda.pk %}" class="botao">+ Lançar item</a>
+    <a href="{% url 'atendimento:fechar_comanda' comanda.pk %}" class="botao">Fechar conta</a>
+    <a href="{% url 'atendimento:cancelar_comanda' comanda.pk %}" class="botao claro">Cancelar comanda</a>
 </div>
 {% endif %}
 <p>
@@ -53,5 +55,11 @@
     <div><span>Desconto</span><span>− R$ {{ comanda.desconto|floatformat:2 }}</span></div>
     {% endif %}
     <div class="final"><span>Total</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
+        {% if comanda.total_pago %}
+    <div style="margin-top:.75rem; border-top:1px dashed #ccc; padding-top:.75rem">
+        <span>Pago em {{ comanda.get_forma_pagamento_display }}</span>
+        <span><strong>R$ {{ comanda.total_pago|floatformat:2 }}</strong></span>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

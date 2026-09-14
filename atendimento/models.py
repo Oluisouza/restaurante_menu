@@ -118,13 +118,22 @@ class Comanda(models.Model):
     def esta_aberta(self):
         return self.status == self.Status.ABERTA
 
-    def fechar(self, forma_pagamento):
+    def fechar(self, forma_pagamento=None):
         if not self.esta_aberta:
             raise ValidationError('Comanda já está fechada ou cancelada.')
+        
         if not self.itens_validos.exists():
             raise ValidationError('Comanda não pode ser fechada sem itens válidos.')
 
-        self.forma_pagamento = forma_pagamento
+        if forma_pagamento:
+            self.forma_pagamento = forma_pagamento
+
+        if not self.forma_pagamento:
+            raise ValidationError('Informe a forma de pagamento.')
+
+        if self.desconto > self.subtotal + self.valor_taxa_servico:
+            raise ValidationError('O desconto não pode ser maior que o valor da conta')
+
         self.total_pago = self.total
         self.fechada_em = timezone.now()
         self.status = self.Status.FECHADA

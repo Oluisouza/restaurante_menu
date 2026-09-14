@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Cancelar {{ comanda.codigo }} — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Cancelar comanda</h2>
+
+<div class="form-box">
+    <p>
+        Você está prestes a cancelar a comanda <strong>{{ comanda.codigo }}</strong>
+        {% if comanda.mesa %}da {{ comanda.mesa }}{% endif %}
+        ({{ comanda.responsavel|default:"sem nome" }}),
+        com {{ comanda.itens_validos.count }} item{{ comanda.itens_validos.count|pluralize:"ns" }}
+        e total de R$ {{ comanda.total|floatformat:2 }}.
+    </p>
+    <p><strong>Esta ação não pode ser desfeita.</strong></p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="acoes">
+            <button type="submit" class="botao">Sim, cancelar comanda</button>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Voltar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

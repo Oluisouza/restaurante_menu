@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Fechar {{ comanda.codigo }} — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Fechar conta</h2>
+<p>
+    {{ comanda.codigo }} ·
+    {% if comanda.mesa %}{{ comanda.mesa }}{% else %}{{ comanda.get_tipo_display }}{% endif %} ·
+    {{ comanda.responsavel|default:"sem nome" }}
+</p>
+
+{% if nao_entregues %}
+<ul class="avisos">
+    <li class="warning">
+        {{ nao_entregues }} item{{ nao_entregues|pluralize:"ns" }} ainda não foi entregue.
+        Confirme com a cozinha antes de fechar.
+    </li>
+</ul>
+{% endif %}
+
+<h3>Conferência</h3>
+<table>
+    <tr><th>Item</th><th class="direita">Qtd</th><th class="direita">Unit.</th><th class="direita">Total</th></tr>
+    {% for item in itens %}
+    <tr>
+        <td>
+            {{ item.descricao_produto }}
+            {% if item.observacao %}<br><small>{{ item.observacao }}</small>{% endif %}
+        </td>
+        <td class="direita">{{ item.quantidade }}</td>
+        <td class="direita">R$ {{ item.preco_unitario|floatformat:2 }}</td>
+        <td class="direita">R$ {{ item.total|floatformat:2 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="vazio">Nenhum item lançado.</td></tr>
+    {% endfor %}
+</table>
+
+<div class="totais">
+    <div><span>Subtotal</span><span>R$ {{ comanda.subtotal|floatformat:2 }}</span></div>
+    <div class="final"><span>Total atual</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
+</div>
+
+<h3>Pagamento</h3>
+<div class="form-box">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="acoes">
+            <button type="submit" class="botao">Confirmar fechamento</button>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Voltar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

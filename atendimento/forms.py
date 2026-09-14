@@ -63,3 +63,21 @@ class ItemComandaForm(forms.ModelForm):
         self.fields['combo'].empty_label = '- ou escolha um combo -'
 
         self.fields['preco_unitario'].required = False
+
+class FechamentoForm(forms.ModelForm):
+
+    class Meta:
+        model = Comanda
+        fields = ['forma_pagamento', 'taxa_servico', 'desconto']
+        labels = {
+            'forma_pagamento': 'Forma de Pagamento',
+            'taxa_servico': 'Cobrar taxa de serviço (10%)',
+            'desconto': 'Desconto (R$)',
+        }
+        help_texts = {
+            'desconto': 'Deixe 0,00 se não houver desconto.',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['forma_pagamento'].required = True
