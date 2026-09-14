@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Editar item — {{ comanda.codigo }}{% endblock %}
+
+{% block conteudo %}
+<h2>Editar item</h2>
+<p>{{ comanda.codigo }} · {{ comanda.responsavel|default:"sem nome" }}</p>
+
+<div class="form-box">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="acoes">
+            <button type="submit" class="botao">Salvar alterações</button>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

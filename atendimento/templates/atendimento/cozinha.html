@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Cozinha — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Cozinha</h2>
+<p>{{ itens|length }} item{{ itens|length|pluralize:"ns" }} na fila, do mais antigo para o mais novo.</p>
+
+<table>
+    <tr>
+        <th>Item</th><th>Comanda</th><th class="direita">Qtd</th>
+        <th>Pedido às</th><th>Status</th><th>Ações</th>
+    </tr>
+    {% for item in itens %}
+    <tr>
+        <td>
+            <strong>{{ item.descricao_produto }}</strong>
+            {% if item.observacao %}<br><small>⚠ {{ item.observacao }}</small>{% endif %}
+        </td>
+        <td>
+            {{ item.comanda.codigo }}<br>
+            <small>{% if item.comanda.mesa %}{{ item.comanda.mesa }}{% else %}{{ item.comanda.get_tipo_display }}{% endif %}</small>
+        </td>
+        <td class="direita">{{ item.quantidade }}</td>
+        <td>{{ item.criado_em|date:"H:i" }}</td>
+        <td><span class="etiqueta {{ item.status }}">{{ item.get_status_display }}</span></td>
+        <td>
+            <form method="post" style="display:flex; gap:.3rem">
+                {% csrf_token %}
+                <input type="hidden" name="item" value="{{ item.pk }}">
+                {% if item.status == 'PENDENTE' %}
+                    <button type="submit" name="status" value="EM_PREPARO" class="botao">Marchar</button>
+                {% elif item.status == 'EM_PREPARO' %}
+                    <button type="submit" name="status" value="PRONTO" class="botao">Pronto</button>
+                {% elif item.status == 'PRONTO' %}
+                    <button type="submit" name="status" value="ENTREGUE" class="botao">Entregue</button>
+                {% endif %}
+                <button type="submit" name="status" value="CANCELADO" class="botao claro">Cancelar</button>
+            </form>
+        </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="vazio">Nenhum item na fila. 🎉</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}

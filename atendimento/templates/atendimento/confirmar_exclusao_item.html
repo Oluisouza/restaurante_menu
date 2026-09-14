@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Remover item — {{ comanda.codigo }}{% endblock %}
+
+{% block conteudo %}
+<h2>Remover item</h2>
+
+<div class="form-box">
+    <p>
+        Remover <strong>{{ item.quantidade }}× {{ item.descricao_produto }}</strong>
+        {% if item.observacao %}({{ item.observacao }}){% endif %}
+        da comanda <strong>{{ comanda.codigo }}</strong>?
+    </p>
+    <p>Valor do item: R$ {{ item.total|floatformat:2 }}. <strong>Esta ação não pode ser desfeita.</strong></p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="acoes">
+            <button type="submit" class="botao">Sim, remover</button>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Voltar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

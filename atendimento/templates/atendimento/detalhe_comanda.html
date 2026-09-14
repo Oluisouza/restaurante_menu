@@ -19,13 +19,13 @@
     — {{ comanda.responsavel|default:"sem nome" }}
 </p>
 <p><small>Aberta em {{ comanda.aberta_em|date:"d/m/Y H:i" }}
-{% if comanda.fechada_em %}· Fechada em {{ comanda.fechada_em|date:"d/m/Y H:i" }}{% endif %}</small></p>
+        {% if comanda.fechada_em %}· Fechada em {{ comanda.fechada_em|date:"d/m/Y H:i" }}{% endif %}</small></p>
 
 <h3>Itens</h3>
 <table>
     <tr>
         <th>Item</th><th>Obs.</th><th class="direita">Qtd</th>
-        <th class="direita">Unit.</th><th class="direita">Total</th><th>Status</th>
+        <th class="direita">Unit.</th><th class="direita">Total</th><th>Status</th><th></th>
     </tr>
     {% for item in itens %}
     <tr>
@@ -40,9 +40,15 @@
         <td class="direita">R$ {{ item.preco_unitario|floatformat:2 }}</td>
         <td class="direita">R$ {{ item.total|floatformat:2 }}</td>
         <td><span class="etiqueta {{ item.status }}">{{ item.get_status_display }}</span></td>
+        <td>
+            {% if comanda.esta_aberta %}
+            <a href="{% url 'atendimento:editar_item' item.pk %}"><small>editar</small></a> ·
+            <a href="{% url 'atendimento:excluir_item' item.pk %}"><small>remover</small></a>
+            {% endif %}
+        </td>
     </tr>
     {% empty %}
-    <tr><td colspan="6" class="vazio">Nenhum item lançado ainda.</td></tr>
+    <tr><td colspan="7" class="vazio">Nenhum item lançado ainda.</td></tr>
     {% endfor %}
 </table>
 
@@ -55,7 +61,7 @@
     <div><span>Desconto</span><span>− R$ {{ comanda.desconto|floatformat:2 }}</span></div>
     {% endif %}
     <div class="final"><span>Total</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
-        {% if comanda.total_pago %}
+    {% if comanda.total_pago %}
     <div style="margin-top:.75rem; border-top:1px dashed #ccc; padding-top:.75rem">
         <span>Pago em {{ comanda.get_forma_pagamento_display }}</span>
         <span><strong>R$ {{ comanda.total_pago|floatformat:2 }}</strong></span>

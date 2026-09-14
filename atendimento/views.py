@@ -116,3 +116,55 @@ def cancelar_comanda(request, pk):
         return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
 
     return render(request, 'atendimento/confirmar_cancelamento.html', {'comanda': comanda})
+
+def editar_item(request, pk):
+    item = get_object_or_404(ItemComanda.objects.select_related('comanda', 'comanda__mesa'), pk=pk)
+    comanda = item.comanda
+
+    if not comanda.esta_aberta:
+        messages.error(request, f'A comanda {comanda.codigo} já foi encerrada.')
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+
+    if request.method == 'POST':
+        form = ItemComandaForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Item atualizado.')
+            return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+    else:
+        form = ItemComandaForm(instance=item)
+
+    return render(request, 'atendimento/form_item_edicao.html', {'form': form, 'item': item, 'comanda': comanda},)
+
+def excluir_item(request, pk):
+    item = get_object_or_404(ItemComanda.objects.select_related('comanda'), pk=pk)
+    comanda = item.comanda
+
+    if not comanda.esta_aberta:
+        messages.error(request, f'A comanda {comanda.codigo} já foi encerrada.')
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+
+    if request.method == 'POST':
+        descricao = item.descricao_produto
+        item.delete()
+        messages.success(request, f'{descricao} removido da comanda.')
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+
+    return render(request, 'atendimento/confirmar_exclusao_item.html', {'item': item, 'comanda': comanda}, )
+
+def cozinha(request):
+    if request.method == 'POST':
+        item = get_object_or_404(ItemComanda, pk=request.POST.get('item'))
+        novo_status = request.POST.get('status')
+
+        if novo_status in ItemComanda.Status.values:
+            item.status = novo_status
+            item.save(update_fields=['status'])
+            messages.success(request, f'{item.descricao_produto}: {item.get_status_display()}.')
+        else:
+            messages.error(request, 'Status Inválido')
+
+        return redirect('atendimento:cozinha')
+
+    itens = (ItemComanda.objects.filter(comanda__status=Comanda.Status.ABERTA).exclude(status__in=[ItemComanda.Status.ENTREGUE, ItemComanda.Status.CANCELADO]).select_related('comanda', 'comanda__mesa', 'prato', 'combo').order_by('criado_em'))
+    return render(request, 'atendimento/cozinha.html', {'itens': itens})
