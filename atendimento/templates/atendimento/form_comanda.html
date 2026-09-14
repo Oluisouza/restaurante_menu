@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Nova comanda — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Nova comanda</h2>
+
+<div class="form-box">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="acoes">
+            <button type="submit" class="botao">Abrir comanda</button>
+            <a href="{% url 'atendimento:salao' %}" class="botao claro">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

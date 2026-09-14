@@ -6,6 +6,11 @@
 <h2>{{ comanda.codigo }}
     <span class="etiqueta {{ comanda.status }}">{{ comanda.get_status_display }}</span>
 </h2>
+{% if comanda.esta_aberta %}
+<div class="acoes">
+    <a href="{% url 'atendimento:lancar_item' comanda.pk %}" class="botao">+ Lançar item</a>
+</div>
+{% endif %}
 <p>
     {{ comanda.get_tipo_display }}
     {% if comanda.mesa %}— {{ comanda.mesa }}{% endif %}

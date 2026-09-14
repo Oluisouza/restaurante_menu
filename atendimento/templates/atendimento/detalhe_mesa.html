@@ -4,6 +4,9 @@
 
 {% block conteudo %}
 <h2>{{ mesa }}</h2>
+<div class="acoes">
+    <a href="{% url 'atendimento:nova_comanda' %}?mesa={{ mesa.pk }}" class="botao">+ Nova comanda nesta mesa</a>
+</div>
 <p>{{ mesa.capacidade }} lugares ·
    {% if mesa.ocupada %}<strong>ocupada</strong>{% else %}livre{% endif %}</p>
 

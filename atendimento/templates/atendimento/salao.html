@@ -4,28 +4,38 @@
 
 {% block conteudo %}
 <h2>Salão</h2>
+<div class="acoes">
+    <a href="{% url 'atendimento:nova_comanda' %}" class="botao">+ Nova comanda</a>
+</div>
 <p>{{ total_abertas }} comanda{{ total_abertas|pluralize }} aberta{{ total_abertas|pluralize }}.</p>
 
 <h3>Mesas</h3>
 <div class="grade">
     {% for mesa in mesas %}
-        <a class="cartao {% if mesa.ocupada %}ocupada{% else %}livre{% endif %}"
-           href="{% url 'atendimento:detalhe_mesa' mesa.pk %}">
-            <strong>{{ mesa }}</strong><br>
-            <small>{{ mesa.capacidade }} lugares</small>
-            {% for comanda in mesa.comandas_abertas %}
-                <div><small>{{ comanda.responsavel|default:"sem nome" }} — R$ {{ comanda.total|floatformat:2 }}</small></div>
-            {% empty %}
-                <div><small style="color:#5c8a3a">livre</small></div>
-            {% endfor %}
-        </a>
+    <div class="cartao {% if mesa.ocupada %}ocupada{% else %}livre{% endif %}">
+        <a href="{% url 'atendimento:detalhe_mesa' mesa.pk %}"><strong>{{ mesa }}</strong></a><br>
+        <small>{{ mesa.capacidade }} lugares</small>
+        {% for comanda in mesa.comandas_abertas %}
+        <div><small>{{ comanda.responsavel|default:"sem nome" }} — R$ {{ comanda.total|floatformat:2 }}</small></div>
+        {% empty %}
+        <div><small style="color:#5c8a3a">livre</small></div>
+        {% endfor %}
+        <div style="margin-top:.5rem">
+            <a href="{% url 'atendimento:nova_comanda' %}?mesa={{ mesa.pk }}"><small>+ abrir comanda</small></a>
+        </div>
+    </div>
     {% endfor %}
 </div>
 
 <h3>Viagem e balcão</h3>
 {% if avulsas %}
 <table>
-    <tr><th>Código</th><th>Tipo</th><th>Responsável</th><th class="direita">Total</th></tr>
+    <tr>
+        <th>Código</th>
+        <th>Tipo</th>
+        <th>Responsável</th>
+        <th class="direita">Total</th>
+    </tr>
     {% for comanda in avulsas %}
     <tr>
         <td><a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">{{ comanda.codigo }}</a></td>
