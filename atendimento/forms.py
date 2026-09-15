@@ -33,16 +33,14 @@ class ItemComandaForm(forms.ModelForm):
 
     class Meta:
         model = ItemComanda
-        fields = ['prato', 'combo', 'quantidade', 'observacao', 'preco_unitario']
+        fields = ['prato', 'combo', 'quantidade', 'observacao']
         labels = {
             'prato': 'Item do cardápio',
             'combo': 'Combo',
             'quantidade': 'Quantidade',
             'observacao': 'Observação',
-            'preco_unitario': 'Preço unitário',
         }
         help_texts = {
-            'preco_unitario': 'Deixe em branco para usar o preço de tabela',
             'observacao': 'Ex.: sem açucar, leite vegetal, bem passado.',
         }
         widgets = {
