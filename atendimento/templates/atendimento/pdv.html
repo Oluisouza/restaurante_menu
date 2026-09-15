@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Lançar pedido — {{ comanda.codigo }}{% endblock %}
+
+{% block conteudo %}
+<h2>{{ comanda.codigo }}</h2>
+<p>
+    {% if comanda.mesa %}{{ comanda.mesa }}{% else %}{{ comanda.get_tipo_display }}{% endif %}
+    · {{ comanda.responsavel|default:"sem nome" }}
+</p>
+
+<div class="pdv">
+
+    <div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="adicionar">
+
+            {% for categoria in categorias %}
+                {% if categoria.pratos.all %}
+                <h3>{{ categoria.nome }}</h3>
+                <div class="grade-produtos">
+                    {% for prato in categoria.pratos.all %}
+                    <button type="submit" name="prato" value="{{ prato.pk }}" class="produto">
+                        <strong>{{ prato.nome }}</strong>
+                        <small>R$ {{ prato.preco|floatformat:2 }}</small>
+                    </button>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+
+            {% if combos %}
+            <h3>Combos</h3>
+            <div class="grade-produtos">
+                {% for combo in combos %}
+                <button type="submit" name="combo" value="{{ combo.pk }}" class="produto combo-btn">
+                    <strong>{{ combo.nome }}</strong>
+                    <small>R$ {{ combo.preco|floatformat:2 }}</small>
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="carrinho">
+        <h3>Comanda</h3>
+
+        {% for item in itens %}
+        <div class="linha-item">
+            <div class="nome">
+                {{ item.descricao_produto }}
+                {% if item.observacao %}<small>{{ item.observacao }}</small>{% endif %}
+                {% if item.status != 'PENDENTE' %}
+                    <small>{{ item.get_status_display }}</small>
+                {% endif %}
+            </div>
+            <form method="post" class="qtd">
+                {% csrf_token %}
+                <input type="hidden" name="item" value="{{ item.pk }}">
+                <button type="submit" name="acao" value="decrementar" title="Diminuir">−</button>
+                <span>{{ item.quantidade }}</span>
+                <button type="submit" name="acao" value="incrementar" title="Aumentar">+</button>
+                <button type="submit" name="acao" value="remover" class="remover" title="Remover">×</button>
+            </form>
+            <div class="valor">R$ {{ item.total|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <p class="vazio">Clique nos produtos para lançar.</p>
+        {% endfor %}
+
+        <div class="total-carrinho">
+            <span>Total</span>
+            <span>R$ {{ comanda.total|floatformat:2 }}</span>
+        </div>
+
+        <div class="acoes" style="margin-top:1rem">
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Ver comanda</a>
+            {% if itens %}
+            <a href="{% url 'atendimento:fechar_comanda' comanda.pk %}" class="botao">Fechar conta</a>
+            {% endif %}
+        </div>
+
+        <p style="margin-top:.75rem"><small>
+            Para adicionar observação, use <em>editar</em> na tela da comanda.
+        </small></p>
+    </div>
+
+</div>
+{% endblock %}

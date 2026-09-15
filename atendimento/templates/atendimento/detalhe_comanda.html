@@ -8,7 +8,7 @@
 </h2>
 {% if comanda.esta_aberta %}
 <div class="acoes">
-    <a href="{% url 'atendimento:lancar_item' comanda.pk %}" class="botao">+ Lançar item</a>
+    <a href="{% url 'atendimento:lancar_item' comanda.pk %}" class="botao">+ Lançar pedido</a>
     <a href="{% url 'atendimento:fechar_comanda' comanda.pk %}" class="botao">Fechar conta</a>
     <a href="{% url 'atendimento:cancelar_comanda' comanda.pk %}" class="botao claro">Cancelar comanda</a>
 </div>

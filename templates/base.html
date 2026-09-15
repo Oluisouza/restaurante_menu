@@ -300,6 +300,146 @@
             font-size: .85rem;
             margin-bottom: .3rem;
         }
+
+        .pdv {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .pdv {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .grade-produtos {
+            display: grid;
+            gap: .5rem;
+            margin-bottom: 1.25rem;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        }
+
+        .produto {
+            background: #fff;
+            border: 1px solid #e0d9cf;
+            border-radius: 8px;
+            padding: .7rem .6rem;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: .2rem;
+            font: inherit;
+            min-height: 68px;
+            transition: border-color .12s, transform .06s;
+        }
+
+        .produto:hover {
+            border-color: #b08968;
+        }
+
+        .produto:active {
+            transform: scale(.97);
+        }
+
+        .produto strong {
+            font-size: .88rem;
+            line-height: 1.25;
+            color: #2b2724;
+        }
+
+        .produto small {
+            color: #8a7f75;
+            font-size: .8rem;
+        }
+
+        .produto.combo-btn {
+            background: #f7f1e8;
+            border-color: #d8c6ad;
+        }
+
+        .carrinho {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #e0d9cf;
+            position: sticky;
+            top: 1rem;
+        }
+
+        .carrinho h3 {
+            margin-top: 0;
+        }
+
+        .linha-item {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            padding: .45rem 0;
+            border-bottom: 1px solid #f0ece6;
+        }
+
+        .linha-item .nome {
+            flex: 1;
+            font-size: .88rem;
+        }
+
+        .linha-item .nome small {
+            display: block;
+            color: #8a7f75;
+        }
+
+        .qtd {
+            display: flex;
+            align-items: center;
+            gap: .15rem;
+        }
+
+        .qtd button {
+            padding: .15rem .45rem;
+            font-size: .9rem;
+            line-height: 1;
+            background: #efe9e1;
+            color: #3d2b1f;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .qtd button:hover {
+            background: #e0d5c6;
+        }
+
+        .qtd .remover {
+            background: #f6d5cf;
+            color: #7a2413;
+        }
+
+        .qtd span {
+            min-width: 1.5rem;
+            text-align: center;
+            font-weight: 600;
+            font-size: .9rem;
+        }
+
+        .linha-item .valor {
+            min-width: 68px;
+            text-align: right;
+            font-size: .88rem;
+        }
+
+        .total-carrinho {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: .8rem;
+            padding-top: .8rem;
+            border-top: 2px solid #3d2b1f;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
     </style>
 </head>
 

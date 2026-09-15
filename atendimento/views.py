@@ -2,9 +2,11 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import Http404
+from django.db.models import Prefetch
 
 from .forms import ComandaForm, ItemComandaForm, FechamentoForm
 from .models import Comanda, Mesa, ItemComanda
+from cardapio.models import Categoria, Combo, Prato
 
 def salao(request):
     mesas = Mesa.objects.filter(ativa=True)
@@ -62,6 +64,44 @@ def nova_comanda(request, tipo):
 
     return render(request, 'atendimento/form_comanda.html', contexto)
 
+def _adicionar_produto(request, comanda):
+    prato_id = request.POST.get('prato')
+    combo_id = request.POST.get('combo')
+
+    if prato_id:
+        produto = get_object_or_404(Prato, pk=prato_id, disponivel=True)
+        chave = {'prato': produto, 'combo': None}
+    elif combo_id:
+        produto = get_object_or_404(Combo, pk=combo_id, disponivel=True)
+        chave = {'prato': None, 'combo': produto}
+    else:
+        messages.error(request, 'Nenhum produto informado.')
+        return
+
+    existente = comanda.itens.filter(status=ItemComanda.Status.PENDENTE, observacao='', **chave).first()
+
+    if existente:
+        existente.quantidade += 1
+        existente.save(update_fields=['quantidade'])
+    else:
+        ItemComanda.objects.create(comanda=comanda, quantidade=1, **chave)
+
+    messages.success(request, f'{produto.nome} lançado.')
+
+def _ajustar_item(request, comanda, acao):
+    item = get_object_or_404(ItemComanda, pk=request.POST.get('item'), comanda=comanda)
+    descricao = item.descricao_produto
+
+    if acao == 'incrementar':
+        item.quantidade += 1
+        item.save(update_fields=['quantidade'])
+    elif acao == 'decrementar' and item.quantidade > 1:
+        item.quantidade -= 1
+        item.save(update_fields=['quantidade'])
+    else:
+        item.delete()
+        messages.success(request, f'{descricao} removido.')
+
 def lancar_item(request, pk):
     comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
 
@@ -70,24 +110,26 @@ def lancar_item(request, pk):
         return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
 
     if request.method == 'POST':
-        form = ItemComandaForm(request.POST)
-        if form.is_valid():
-            item = form.save(commit=False)
-            item.comanda = comanda
-            item.save()
-            messages.success(request, f'{item.quantidade}x {item.descricao_produto} lançado.',)
-            if 'salvar_e_novo' in request.POST:
-                return redirect('atendimento:lancar_item', pk=comanda.pk)
-            return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
-    else:
-        form = ItemComandaForm()
+        acao = request.POST.get('acao')
+        if acao == 'adicionar':
+            _adicionar_produto(request, comanda)
+        elif acao in ('incrementar', 'decrementar', 'remover'):
+            _ajustar_item(request, comanda, acao)
+        else:
+            messages.error(request, 'Ação desconhecida.')
+        return redirect('atendimento:lancar_item', pk=comanda.pk)
+
+    categorias = (
+        Categoria.objects.filter(eh_adicional=False).prefetch_related(Prefetch('pratos', queryset=Prato.objects.filter(disponivel=True)))
+    )
 
     contexto = {
-        'form': form,
         'comanda': comanda,
-        'itens': comanda.itens.select_related('prato', 'combo'),
+        'categorias': categorias,
+        'combos': Combo.objects.filter(disponivel=True).prefetch_related('itens__prato'),
+        'itens': comanda.itens_validos.select_related('prato', 'combo'),
     }
-    return render(request, 'atendimento/form_item.html', contexto)
+    return render(request, 'atendimento/pdv.html', contexto)
 
 def fechar_comanda(request, pk):
     comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
