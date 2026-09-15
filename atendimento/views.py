@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, render, redirect
+from django.http import Http404
 
 from .forms import ComandaForm, ItemComandaForm, FechamentoForm
 from .models import Comanda, Mesa, ItemComanda
@@ -29,9 +30,19 @@ def lista_comandas(request):
     contexto = {'comandas': comandas, 'status_selecionado': status, 'status_opcoes': Comanda.Status.choices,}
     return render(request, 'atendimento/lista_comandas.html', contexto)
 
-def nova_comanda(request):
+TIPOS_POR_URL = {
+    'mesa': Comanda.Tipo.MESA,
+    'viagem': Comanda.Tipo.VIAGEM,
+    'balcao': Comanda.Tipo.BALCAO,
+}
+
+def nova_comanda(request, tipo):
+    tipo_valor = TIPOS_POR_URL.get(tipo)
+    if tipo_valor is None:
+        raise Http404('Tipo de atendimento inválido.')
+    
     if request.method == 'POST':
-        form = ComandaForm(request.POST)
+        form = ComandaForm(request.POST, instance=Comanda(tipo=tipo_valor), tipo=tipo_valor)
         if form.is_valid():
             comanda = form.save()
             messages.success(request, f'Comanda {comanda.codigo} aberta.')
@@ -39,11 +50,17 @@ def nova_comanda(request):
     else:
         inicial = {}
         mesa_id = request.GET.get('mesa')
-        if mesa_id:
-            inicial = {'tipo': Comanda.Tipo.MESA, 'mesa': mesa_id}
-        form = ComandaForm(initial=inicial)
+        if mesa_id and tipo_valor == Comanda.Tipo.MESA:
+            inicial['mesa'] = mesa_id
+        form = ComandaForm(initial=inicial, instance=Comanda(tipo=tipo_valor), tipo=tipo_valor)
 
-    return render(request, 'atendimento/form_comanda.html', {'form': form})
+    contexto = {
+        'form': form,
+        'tipo': tipo_valor,
+        'rotulo_tipo': dict(Comanda.Tipo.choices)[tipo_valor],
+    }
+
+    return render(request, 'atendimento/form_comanda.html', contexto)
 
 def lancar_item(request, pk):
     comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)

@@ -3,14 +3,14 @@
 {% block titulo %}Nova comanda — Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>Nova comanda</h2>
+<h2>Nova comanda · {{ rotulo_tipo }}</h2>
 
 <div class="form-box">
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
         <div class="acoes">
-            <button type="submit" class="botao">Abrir comanda</button>
+            <button type="submit" class="botao">Abrir e lançar pedido</button>
             <a href="{% url 'atendimento:salao' %}" class="botao claro">Cancelar</a>
         </div>
     </form>

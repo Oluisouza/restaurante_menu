@@ -8,26 +8,28 @@ class ComandaForm(forms.ModelForm):
 
     class Meta:
         model = Comanda
-        fields = ['tipo', 'mesa', 'responsavel', 'taxa_servico']
+        fields = ['mesa', 'responsavel', 'taxa_servico']
         labels = {
-            'tipo': 'Tipo de Atendimento',
             'mesa': 'Mesa',
             'responsavel': 'Responsável',
             'taxa_servico': 'Cobrar taxa de serviço (10%)',
         }
         help_texts = {
             'responsavel': 'Nome do cliente ou como identificá-lo.',
-            'mesa': 'Obrigatório apenas para comanda de mesa.',        
         }
         widgets = {
-            'responsavel': forms.TextInput(attrs={'placeholder': 'Ex.: João, ou camisa azul'}),
+            'responsavel': forms.TextInput(attrs={'placeholder': 'Ex.: João, ou camisa azul', 'autofocus': True}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, tipo=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['mesa'].queryset = Mesa.objects.filter(ativa=True)
-        self.fields['mesa'].required = False
-        self.fields['mesa'].empty_label = 'Sem mesa (viagem ou balcao)'
+        if tipo == Comanda.Tipo.MESA:
+            self.fields['mesa'].queryset = Mesa.objects.filter(ativa=True)
+            self.fields['mesa'].required = True
+            self.fields['mesa'].empty_label = '- Escolha a mesa -'
+        else:
+            del self.fields['mesa']
+            del self.fields['taxa_servico']
 
 class ItemComandaForm(forms.ModelForm):
 

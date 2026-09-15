@@ -5,7 +5,8 @@
 {% block conteudo %}
 <h2>Salão</h2>
 <div class="acoes">
-    <a href="{% url 'atendimento:nova_comanda' %}" class="botao">+ Nova comanda</a>
+    <a href="{% url 'atendimento:nova_comanda' 'viagem' %}" class="botao">🛍 Nova · Viagem</a>
+    <a href="{% url 'atendimento:nova_comanda' 'balcao' %}" class="botao">🧾 Nova · Balcão</a>
 </div>
 <p>{{ total_abertas }} comanda{{ total_abertas|pluralize }} aberta{{ total_abertas|pluralize }}.</p>
 
@@ -21,7 +22,7 @@
         <div><small style="color:#5c8a3a">livre</small></div>
         {% endfor %}
         <div style="margin-top:.5rem">
-            <a href="{% url 'atendimento:nova_comanda' %}?mesa={{ mesa.pk }}"><small>+ abrir comanda</small></a>
+            <a href="{% url 'atendimento:nova_comanda' 'mesa' %}?mesa={{ mesa.pk }}"><small>+ abrir comanda</small></a>
         </div>
     </div>
     {% endfor %}
