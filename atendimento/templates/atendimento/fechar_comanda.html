@@ -80,29 +80,29 @@
     const valorDesconto = document.getElementById('valor-desconto');
     const valorTotal = document.getElementById('valor-total');
 
-    function moeda(v) {
-        return 'R$ ' + v.toFixed(2).replace('.', ',');
+    function moeda(centavos) {
+        return 'R$ ' + (centavos / 100).toFixed(2).replace('.', ',');
     }
 
     function recalcular() {
+        const subtotalCentavos = Math.round(subtotal * 100);
         const cobraTaxa = campoTaxa && campoTaxa.checked;
-        const taxa = cobraTaxa ? Math.round(subtotal * 10) / 100 : 0;
+        const taxaCentavos = cobraTaxa ? Math.round(subtotalCentavos / 10) : 0;
 
         let desconto = parseFloat((campoDesconto.value || '0').replace(',', '.'));
         if (isNaN(desconto) || desconto < 0) desconto = 0;
+        const descontoCentavos = Math.round(desconto * 100);
 
         linhaTaxa.style.display = cobraTaxa ? 'flex' : 'none';
-        valorTaxa.textContent = moeda(taxa);
+        valorTaxa.textContent = moeda(taxaCentavos);
 
-        linhaDesconto.style.display = desconto > 0 ? 'flex' : 'none';
-        valorDesconto.textContent = '− ' + moeda(desconto);
+        linhaDesconto.style.display = descontoCentavos > 0 ? 'flex' : 'none';
+        valorDesconto.textContent = '− ' + moeda(descontoCentavos);
 
-        valorTotal.textContent = moeda(Math.max(subtotal + taxa - desconto, 0));
+        valorTotal.textContent = moeda(
+            Math.max(subtotalCentavos + taxaCentavos - descontoCentavos, 0)
+        );
     }
-
-    if (campoTaxa) campoTaxa.addEventListener('change', recalcular);
-    if (campoDesconto) campoDesconto.addEventListener('input', recalcular);
-    recalcular();
 })();
 </script>
 {% endblock %}

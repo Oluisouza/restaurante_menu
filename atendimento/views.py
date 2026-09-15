@@ -16,7 +16,7 @@ def salao(request):
 
 def detalhe_comanda(request, pk):
     comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
-    contexto = { 'comanda': comanda, 'itens': comanda.itens.select_related('prato', 'combo'),}
+    contexto = { 'comanda': comanda, 'itens': comanda.itens_validos.select_related('prato', 'combo'),}
     return render(request, 'atendimento/detalhe_comanda.html', contexto)
 
 def detalhe_mesa(request, pk):
@@ -212,16 +212,30 @@ def excluir_item(request, pk):
     return render(request, 'atendimento/confirmar_exclusao_item.html', {'item': item, 'comanda': comanda}, )
 
 def cozinha(request):
+    TRANSICOES = {
+        ItemComanda.Status.PENDENTE: [ItemComanda.Status.EM_PREPARO, ItemComanda.Status.CANCELADO],
+        ItemComanda.Status.EM_PREPARO: [ItemComanda.Status.PRONTO, ItemComanda.Status.CANCELADO],
+        ItemComanda.Status.PRONTO: [ItemComanda.Status.ENTREGUE],
+        ItemComanda.Status.ENTREGUE: [],
+        ItemComanda.Status.CANCELADO: [],
+    }
+
     if request.method == 'POST':
-        item = get_object_or_404(ItemComanda, pk=request.POST.get('item'))
+        item = get_object_or_404(
+            ItemComanda.objects.select_related('comanda'), pk=request.POST.get('item')
+        )
         novo_status = request.POST.get('status')
 
-        if novo_status in ItemComanda.Status.values:
+        if not item.comanda.esta_aberta:
+            messages.error(request, 'A comanda deste item já foi encerrada.')
+        elif novo_status not in TRANSICOES[item.status]:
+            messages.error(request, 'Essa mudança de status não é permitida.')
+        else:
             item.status = novo_status
             item.save(update_fields=['status'])
-            messages.success(request, f'{item.descricao_produto}: {item.get_status_display()}.')
-        else:
-            messages.error(request, 'Status Inválido')
+            messages.success(
+                request, f'{item.descricao_produto}: {item.get_status_display()}.'
+            )
 
         return redirect('atendimento:cozinha')
 
