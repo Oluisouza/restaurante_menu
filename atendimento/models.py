@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.core.validators import MinValueValidator
 
 from cardapio.models import Prato, Combo
 
@@ -172,7 +173,7 @@ class ItemComanda(models.Model):
         blank=True,
         null=True,
     )
-    quantidade = models.PositiveIntegerField(default=1)
+    quantidade = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1, 'A quantidade mínima é 1.')])
     preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     observacao = models.CharField(max_length=200, blank=True)
 
@@ -190,6 +191,10 @@ class ItemComanda(models.Model):
                     models.Q(prato__isnull=True, combo__isnull=False)
                 ),
                 name='item_prato_ou_combo',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantidade__gte=1),
+                name='item_quantidade_minima',
             ),
         ]
 

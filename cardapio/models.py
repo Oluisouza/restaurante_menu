@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models.functions import Lower
+from django.core.validators import MinValueValidator
 
 class Categoria(models.Model):
     nome = models.CharField(max_length=100, unique=True)
@@ -91,13 +92,14 @@ class ComboItem(models.Model):
         on_delete=models.PROTECT,
         related_name='combos',
     )
-    quantidade = models.PositiveIntegerField(default=1)
+    quantidade = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1, 'A quantidade mínima é 1.')])
 
     class Meta:
         verbose_name = "item do combo"
         verbose_name_plural = "itens do combo"
         constraints = [
             models.UniqueConstraint(fields=['combo', 'prato'], name='combo_prato_unico'),
+            models.CheckConstraint(condition=models.Q(quantidade__gte=1), name='comboitem_quantidade_minima',),
         ]
 
     def __str__(self):
