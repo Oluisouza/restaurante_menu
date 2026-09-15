@@ -37,7 +37,7 @@ def form_prato(request, pk=None):
             messages.success(request, f'{salvo.nome} {acao}.')
             return redirect('cardapio:lista_pratos')
     else:
-            form = PratoForm(instance=prato)
+        form = PratoForm(instance=prato)
 
     return render(request, 'cardapio/form_prato.html', {'form': form, 'prato': prato})
 
@@ -51,8 +51,8 @@ def excluir_prato(request, pk):
         except ProtectedError:
             messages.error(
                 request,
-                f'{nome} não pode ser excluído porque já foi usado em comandas ou combos. '
-                f'marque como indisponível. ',
+                f'{nome} não pode ser excluído porque já foi usado em comandas '
+                f'ou comboas. Marque como indisponível. ',
             )
         else:
             messages.success(request, f'{nome} excluído do cardápio')

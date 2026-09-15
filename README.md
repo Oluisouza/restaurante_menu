@@ -2,12 +2,12 @@
 
 Sistema de atendimento para restaurantes: abertura de comandas, lançamento de
 pedidos em tela de PDV e fechamento de conta. Validado num contexto de
-cafeteria, mas o domínio é modelado de forma genérica — nada no código assume
-café.
+cafeteria, mas o domínio é modelado de forma genérica — nada no modelo de
+dados assume café.
 
 **Disciplina:** Laboratório de Programação Full Stack
 **Tema:** 09 — Cardápio Digital
-**Stack:** Django 5.2 · PostgreSQL 17 · Django Templates (MPA)
+**Stack:** Django 5.2 · PostgreSQL 17+ · Django Templates (MPA)
 
 ---
 
@@ -68,7 +68,7 @@ Categoria ──< Prato >──< ComboItem >── Combo
                  │                        │
                  └──────────┬─────────────┘
                             │
-Mesa ──< Comanda ──< ItemComanda >── ItemAdicional
+Mesa ──< Comanda ──< ItemComanda ──< ItemAdicional
 ```
 
 - **cardapio**: `Categoria`, `Prato`, `Combo`, `ComboItem`
@@ -91,14 +91,14 @@ atendente.
   do total antes de confirmar**
 - Cancelamento com tela de confirmação
 - Painel da cozinha com fila FIFO e transições de status validadas
-- CRUD completo do cardápio, com controle de disponibilidade
+- CRUD dos itens do cardápio pela tela (categorias e combos pelo Admin), com controle de disponibilidade
 - Busca e filtros nas listagens
 
 ## Como rodar
 
 ```bash
 git clone <url>
-cd comanda_digital
+cd restaurante_menu
 
 python -m venv venv
 venv\Scripts\activate          # Windows
@@ -110,9 +110,9 @@ copy .env.example .env         # Windows
 # cp .env.example .env         # Linux/macOS
 ```
 
-Preencha o `.env` com as credenciais do PostgreSQL. **Inclua
-`DEBUG=True`** — sem essa variável o padrão é `False`, e com
-`ALLOWED_HOSTS = []` todas as requisições voltam `400 Bad Request`.
+Preencha o `.env` com as credenciais do PostgreSQL. **Mantenha `DEBUG=True`**
+(já vem no `.env.example`). Sem essa variável o padrão é `False` e, com
+`ALLOWED_HOSTS = []`, o `runserver` não inicia.
 
 Gere uma `SECRET_KEY` e cole no `.env`:
 
@@ -130,8 +130,8 @@ python manage.py carregar_dados    # cardápio e mesas de exemplo
 python manage.py runserver
 ```
 
-O `carregar_dados` é idempotente: pode ser rodado quantas vezes quiser sem
-duplicar registros. Útil para restaurar o cardápio depois de testes.
+O `carregar_dados` é idempotente: recria categorias, pratos, combos e mesas de
+exemplo que tenham sido apagados, sem duplicar o que já existe. Não desfaz alterações de preço, nome ou disponibilidade.
 
 ## Testes
 
@@ -139,7 +139,10 @@ duplicar registros. Útil para restaurar o cardápio depois de testes.
 python manage.py test
 ```
 
-Cobre um smoke test das rotas principais.
+Cobre GET das telas principais e as regras de negócio centrais: snapshot de
+preço, fechamento sem itens, desconto acima do total, arredondamento da taxa,
+congelamento do `total_pago`, ocupação da mesa, comandas individuais na mesma
+mesa, exclusão de prato vendido e transições da cozinha.
 
 ## Rotas
 
@@ -192,9 +195,9 @@ como decisão consciente de escopo, não como omissão.
 - **Adicionais existem no modelo, mas não têm tela.** `ItemAdicional` é
   gerenciável apenas pelo Admin.
 - **Itens já enviados à cozinha podem ser removidos ou editados.** O atendente
-  consegue remover um item em preparo ou entregue, ou trocar o produto dele,
-  sem que a cozinha seja avisada. Restringir isso exige papéis (quem pode
-  estornar), o que depende da autenticação.
+  consegue remover um item em preparo, pronto ou entregue, trocar o produto ou alterar a quantidade pela tela de edição — o "+/−" do PDV só funciona em item pendente, mas a edição não tem essa trava. A cozinha não é avisada.
+  Restringir isso exige papéis (quem pode estornar), o que depende da
+  autenticação.
 - **Itens cancelados não aparecem na tela da comanda.** Saem do total e da
   lista; o registro só é visível no Admin.
 
@@ -212,8 +215,8 @@ como decisão consciente de escopo, não como omissão.
   acesso, e as listagens não têm paginação nem filtro de data. O custo cresce
   com itens × comandas. Ferramentas: `prefetch_related`, `annotate` e
   `Paginator`.
-- **Duas FKs sem `related_name`** (`ItemComanda.prato` e
-  `ItemAdicional.prato`), o que obriga o acesso reverso `prato.itemcomanda_set`.
+- **Três FKs sem `related_name`** (`ItemComanda.prato`, `ItemComanda.combo` e
+  `ItemAdicional.prato`), o que obriga o acesso reverso `prato.itemcomanda_set` e `combo.itemcomanda_set`.
 - **Sem `STATIC_ROOT`**, e a mídia só é servida com `DEBUG=True`. Configuração
   de deploy é assunto da Aula 18.
 - **Classes CSS de etiqueta reaproveitadas** com nomes semanticamente errados

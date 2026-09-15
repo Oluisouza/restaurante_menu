@@ -42,6 +42,7 @@ class RotasTest(TestCase):
         for tipo in ['mesa', 'viagem', 'balcao']:
             with self.subTest(tipo=tipo):
                 url = reverse('atendimento:nova_comanda', args=[tipo])
+                self.assertEqual(url, f'/comandas/nova/{tipo}/')
                 self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_telas_da_comanda(self):
@@ -106,7 +107,7 @@ class RegrasTest(TestCase):
             comanda.fechar(Comanda.FormaPagamento.PIX)
 
     def test_taxa_arredonda_para_cima(self):
-        casos = [('12.25', '1.23'), ('0.05', '0.01'), ('100.45', '10.05')]
+        casos = [('12.25', '1.23'), ('0.05', '0.01'), ('100.45', '10.05'), ('12.24', '1.22')]
         for subtotal, esperado in casos:
             with self.subTest(subtotal=subtotal):
                 comanda = self._comanda_com_item(subtotal)
@@ -146,6 +147,7 @@ class RegrasTest(TestCase):
         url = reverse('cardapio:excluir_prato', args=[prato.pk])
         resposta = self.client.post(url, follow=True)
         self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'não pode ser excluído')
         self.assertTrue(Prato.objects.filter(pk=prato.pk).exists())
 
     def test_transicoes_da_cozinha(self):
@@ -160,3 +162,23 @@ class RegrasTest(TestCase):
         self.client.post(url, {'item': item.pk, 'status': 'EM_PREPARO'})
         item.refresh_from_db()
         self.assertEqual(item.status, ItemComanda.Status.EM_PREPARO)
+
+        for status in ['PRONTO', 'ENTREGUE', 'PENDENTE']:
+            self.client.post(url, {'item': item.pk, 'status': status})
+        item.refresh_from_db()
+        self.assertEqual(item.status, ItemComanda.Status.ENTREGUE)
+
+        outro = ItemComanda.objects.create(comanda=comanda, prato=item.prato)
+        comanda.fechar(Comanda.FormaPagamento.PIX)
+        self.client.post(url, {'item': outro.pk, 'status': 'CANCELADO'})
+        outro.refresh_from_db()
+        self.assertEqual(outro.status, ItemComanda.Status.PENDENTE)
+
+    def test_mais_e_menos_so_em_item_pendente(self):
+        comanda = self._comanda_com_item('6.00')
+        item = comanda.itens.get()
+        ItemComanda.objects.filter(pk=item.pk).update(status=ItemComanda.Status.ENTREGUE)
+        url = reverse('atendimento:lancar_item', args=[comanda.pk])
+        self.client.post(url, {'acao': 'incrementar', 'item': item.pk})
+        item.refresh_from_db()
+        self.assertEqual(item.quantidade, 1)
