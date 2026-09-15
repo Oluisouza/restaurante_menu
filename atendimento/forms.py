@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 
 from cardapio.models import Combo, Prato
 
@@ -52,17 +53,23 @@ class ItemComandaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        disponiveis = Q(disponivel=True, categoria__eh_adicional=False)
+        if self.instance.pk and self.instance.prato_id:
+            disponiveis |= Q(pk=self.instance.prato_id)
+
         self.fields['prato'].queryset = (
-            Prato.objects.filter(disponivel=True, categoria__eh_adicional=False).select_related('categoria')
+            Prato.objects.filter(disponiveis).select_related('categoria').distinct()
         )
         self.fields['prato'].required = False
-        self.fields['prato'].empty_label = '- escolha um item -'
+        self.fields['prato'].empty_label = '— escolha um item —'
 
-        self.fields['combo'].queryset = Combo.objects.filter(disponivel=True)
+        combos = Q(disponivel=True)
+        if self.instance.pk and self.instance.combo_id:
+            combos |= Q(pk=self.instance.combo_id)
+
+        self.fields['combo'].queryset = Combo.objects.filter(combos).distinct()
         self.fields['combo'].required = False
-        self.fields['combo'].empty_label = '- ou escolha um combo -'
-
-        self.fields['preco_unitario'].required = False
+        self.fields['combo'].empty_label = '— ou escolha um combo —'
 
 class FechamentoForm(forms.ModelForm):
 
@@ -81,3 +88,5 @@ class FechamentoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['forma_pagamento'].required = True
+        if self.instance.tipo != Comanda.Tipo.MESA:
+            del self.fields['taxa_servico']
