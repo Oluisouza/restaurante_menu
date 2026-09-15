@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 
 {% block titulo %}Fechar {{ comanda.codigo }} — Comanda Digital{% endblock %}
 
@@ -37,20 +38,71 @@
     {% endfor %}
 </table>
 
-<div class="totais">
-    <div><span>Subtotal</span><span>R$ {{ comanda.subtotal|floatformat:2 }}</span></div>
-    <div class="final"><span>Total atual</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
-</div>
-
 <h3>Pagamento</h3>
 <div class="form-box">
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
+
+        <div class="totais" id="previa" data-subtotal="{{ comanda.subtotal|unlocalize }}">
+            <div><span>Subtotal</span><span>R$ {{ comanda.subtotal|floatformat:2 }}</span></div>
+            <div id="linha-taxa" style="display:none">
+                <span>Taxa de serviço (10%)</span><span id="valor-taxa">R$ 0,00</span>
+            </div>
+            <div id="linha-desconto" style="display:none">
+                <span>Desconto</span><span id="valor-desconto">R$ 0,00</span>
+            </div>
+            <div class="final">
+                <span>Total a cobrar</span>
+                <span id="valor-total">R$ {{ comanda.total|floatformat:2 }}</span>
+            </div>
+        </div>
+
         <div class="acoes">
             <button type="submit" class="botao">Confirmar fechamento</button>
             <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Voltar</a>
         </div>
     </form>
 </div>
+
+<script>
+(function () {
+    const caixa = document.getElementById('previa');
+    if (!caixa) return;
+
+    const subtotal = parseFloat(caixa.dataset.subtotal);
+    const campoTaxa = document.getElementById('id_taxa_servico');
+    const campoDesconto = document.getElementById('id_desconto');
+
+    const linhaTaxa = document.getElementById('linha-taxa');
+    const linhaDesconto = document.getElementById('linha-desconto');
+    const valorTaxa = document.getElementById('valor-taxa');
+    const valorDesconto = document.getElementById('valor-desconto');
+    const valorTotal = document.getElementById('valor-total');
+
+    function moeda(v) {
+        return 'R$ ' + v.toFixed(2).replace('.', ',');
+    }
+
+    function recalcular() {
+        const cobraTaxa = campoTaxa && campoTaxa.checked;
+        const taxa = cobraTaxa ? Math.round(subtotal * 10) / 100 : 0;
+
+        let desconto = parseFloat((campoDesconto.value || '0').replace(',', '.'));
+        if (isNaN(desconto) || desconto < 0) desconto = 0;
+
+        linhaTaxa.style.display = cobraTaxa ? 'flex' : 'none';
+        valorTaxa.textContent = moeda(taxa);
+
+        linhaDesconto.style.display = desconto > 0 ? 'flex' : 'none';
+        valorDesconto.textContent = '− ' + moeda(desconto);
+
+        valorTotal.textContent = moeda(Math.max(subtotal + taxa - desconto, 0));
+    }
+
+    if (campoTaxa) campoTaxa.addEventListener('change', recalcular);
+    if (campoDesconto) campoDesconto.addEventListener('input', recalcular);
+    recalcular();
+})();
+</script>
 {% endblock %}
