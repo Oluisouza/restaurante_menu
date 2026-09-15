@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 
 from cardapio.models import Categoria, Prato
 
@@ -182,3 +183,48 @@ class RegrasTest(TestCase):
         self.client.post(url, {'acao': 'incrementar', 'item': item.pk})
         item.refresh_from_db()
         self.assertEqual(item.quantidade, 1)
+
+class ConstraintsTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.categoria = Categoria.objects.create(nome='Cafés', ordem=1)
+        cls.prato = Prato.objects.create(
+            nome='Espresso', preco=Decimal('6.00'), categoria=cls.categoria
+        )
+        cls.mesa = Mesa.objects.create(identificacao='01', capacidade=4)
+
+    def _deve_bloquear(self, funcao):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                funcao()
+
+    def test_preco_negativo_bloqueado(self):
+        self._deve_bloquear(lambda: Prato.objects.create(
+            nome='Grátis', preco=Decimal('-1'), categoria=self.categoria
+        ))
+
+    def test_desconto_negativo_bloqueado(self):
+        self._deve_bloquear(lambda: Comanda.objects.create(
+            tipo=Comanda.Tipo.MESA, mesa=self.mesa, desconto=Decimal('-5')
+        ))
+
+    def test_comanda_mesa_exige_mesa(self):
+        self._deve_bloquear(lambda: Comanda.objects.create(tipo=Comanda.Tipo.MESA))
+
+    def test_comanda_viagem_nao_aceita_mesa(self):
+        self._deve_bloquear(lambda: Comanda.objects.create(
+            tipo=Comanda.Tipo.VIAGEM, mesa=self.mesa
+        ))
+
+    def test_capacidade_minima_da_mesa(self):
+        self._deve_bloquear(lambda: Mesa.objects.create(
+            identificacao='99', capacidade=0
+        ))
+
+    def test_estados_legitimos_continuam_passando(self):
+        Prato.objects.create(nome='Cortesia', preco=Decimal('0'), categoria=self.categoria)
+        Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Bruno')
+        Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Carla')
+        self.assertEqual(self.mesa.comandas_abertas.count(), 2)

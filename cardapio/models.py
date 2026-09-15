@@ -49,6 +49,11 @@ class Prato(models.Model):
                 name='prato_nome_unico_ci',
                 violation_error_message='Já existe um item do cardápio com esse nome.',
             ),
+            models.CheckConstraint(
+                condition=models.Q(preco__gte=0),
+                name='prato_preco_nao_negativo',
+                violation_error_message='O preço não pode ser negativo.',
+            ),
         ]
 
     def save(self, *args, **kwargs):
@@ -69,6 +74,22 @@ class Combo(models.Model):
         verbose_name = "combo"
         verbose_name_plural = "combos"
         ordering = ['nome']
+        constraints = [
+            models.UniqueConstraint(
+                Lower('nome'),
+                name='combo_nome_unico_ci',
+                violation_error_message='Já existe um combo com esse nome.',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(preco__gte=0),
+                name='combo_preco_nao_negativo',
+                violation_error_message='O preço não pode ser negativo.',
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.nome = self.nome.strip()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nome

@@ -49,9 +49,11 @@ duas fontes para a mesma informação acabam divergindo.
 nos models, não nas views. Assim fechar() e cancelar() valem em qualquer contexto; 
 as validações de clean() só rodam em formulário.
 
-**Integridade garantida pelo banco.** `CheckConstraint` (item é prato *ou*
-combo; quantidade mínima 1), `UniqueConstraint` com `Lower()` (nomes únicos
-ignorando maiúsculas) e `on_delete=PROTECT` (não apaga o que está em uso).
+**Integridade garantida pelo banco.** Sete `CheckConstraint` e três
+`UniqueConstraint` cobrem: item é prato *ou* combo, quantidade mínima 1,
+preços e descontos não negativos, capacidade mínima de mesa, coerência entre
+tipo de atendimento e mesa, e nomes únicos ignorando maiúsculas em categoria,
+prato e combo. `on_delete=PROTECT` impede apagar o que está em uso.
 
 **Máquina de estados explícita.** As transições de status do item são um
 dicionário na view da cozinha, não uma cadeia de `if`. Não é possível voltar
@@ -221,12 +223,6 @@ como decisão consciente de escopo, não como omissão.
   de deploy é assunto da Aula 18.
 - **Classes CSS de etiqueta reaproveitadas** com nomes semanticamente errados
   (`FECHADA` para "disponível"). Deveriam ser `.positivo` e `.negativo`.
-- **Validações de `clean()` só rodam em formulários.** Desconto negativo e
-  comanda de mesa sem mesa são recusados pelas telas, mas não pelo ORM nem
-  pelo banco. Via shell é possível criar esses estados, e uma comanda de mesa
-  sem mesa quebra a tela de fechamento. A garantia real exige `CheckConstraint`.
-- **Nome de combo não é único.** A unicidade ignorando maiúsculas existe só em
-  categoria e prato.
 - **`ALLOWED_HOSTS` vazio.** Em desenvolvimento o sistema só responde em
   `localhost`; o acesso por outro aparelho da rede recebe 400.
 - **Entradas forjadas não são validadas.** Um POST montado à mão com id não

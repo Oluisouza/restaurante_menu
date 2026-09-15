@@ -75,6 +75,21 @@ class Comanda(models.Model):
         verbose_name = "comanda"
         verbose_name_plural = "comandas"
         ordering = ['-aberta_em']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(desconto__gte=0),
+                name='comanda_desconto_nao_negativo',
+                violation_error_message='O desconto não pode ser negativo.',
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(tipo='MESA', mesa__isnull=False)
+                    | (~models.Q(tipo='MESA') & models.Q(mesa__isnull=True))
+                ),
+                name='comanda_mesa_conforme_tipo',
+                violation_error_message=('Comanda de mesa exige uma mesa; viagem e balcão não podem ter mesa'),
+            ),
+        ]
 
     def __str__(self):
         if self.mesa:
@@ -197,6 +212,11 @@ class ItemComanda(models.Model):
                 condition=models.Q(quantidade__gte=1),
                 name='item_quantidade_minima',
             ),
+            models.CheckConstraint(
+                condition=models.Q(preco_unitario__isnull=True) |
+                models.Q(preco_unitario__gte=0),
+                name='item_preco_nao_negativo',
+            )
         ]
 
     def __str__(self):
