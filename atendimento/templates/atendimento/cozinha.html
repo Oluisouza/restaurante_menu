@@ -35,7 +35,9 @@
                 {% elif item.status == 'PRONTO' %}
                     <button type="submit" name="status" value="ENTREGUE" class="botao">Entregue</button>
                 {% endif %}
+                {% if item.status != 'PRONTO' %}
                 <button type="submit" name="status" value="CANCELADO" class="botao claro">Cancelar</button>
+                {% endif %}
             </form>
         </td>
     </tr>

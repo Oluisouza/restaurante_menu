@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from django.core.exceptions import ValidationError
 
 from cardapio.models import Categoria, Prato
 
@@ -84,20 +85,24 @@ class RegrasTest(TestCase):
 
     def test_preco_e_snapshot(self):
         comanda = self._comanda_com_item('6.00')
-        self.prato.preco = Decimal('99.00')
-        self.prato.save()
-        comanda.refresh_from_db()
-        self.assertEqual(comanda.itens.first().preco_unitario, Decimal('6.00'))
+        item = comanda.itens.get()
+        item.prato.preco = Decimal('99.00')
+        item.prato.save()
+        item.quantidade = 2
+        item.save()
+        item.refresh_from_db()
+        self.assertEqual(item.preco_unitario, Decimal('6.00'))
+        self.assertEqual(comanda.subtotal, Decimal('12.00'))
 
     def test_nao_fecha_sem_itens(self):
         comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='X')
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             comanda.fechar(Comanda.FormaPagamento.PIX)
 
     def test_desconto_maior_que_conta(self):
         comanda = self._comanda_com_item('6.00')
         comanda.desconto = Decimal('999.00')
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             comanda.fechar(Comanda.FormaPagamento.PIX)
 
     def test_taxa_arredonda_para_cima(self):
@@ -111,8 +116,13 @@ class RegrasTest(TestCase):
     def test_total_pago_congela(self):
         comanda = self._comanda_com_item('10.00')
         comanda.fechar(Comanda.FormaPagamento.PIX)
-        self.assertEqual(comanda.total_pago, Decimal('10.00'))
+        item = comanda.itens.get()
+        item.prato.preco = Decimal('50.00')
+        item.prato.save()
+        ItemComanda.objects.create(comanda=comanda, prato=item.prato)
+        comanda.refresh_from_db()
         self.assertEqual(comanda.status, Comanda.Status.FECHADA)
+        self.assertEqual(comanda.total_pago, Decimal('10.00'))
 
     def test_mesa_ocupada_enquanto_houver_comanda(self):
         mesa = Mesa.objects.create(identificacao='99', capacidade=2)
@@ -129,3 +139,24 @@ class RegrasTest(TestCase):
         for nome in ['Ana', 'Bruno']:
             Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=mesa, responsavel=nome)
         self.assertEqual(mesa.comandas_abertas.count(), 2)
+
+    def test_excluir_prato_vendido_e_recusado(self):
+        comanda = self._comanda_com_item('6.00')
+        prato = comanda.itens.get().prato
+        url = reverse('cardapio:excluir_prato', args=[prato.pk])
+        resposta = self.client.post(url, follow=True)
+        self.assertEqual(resposta.status_code, 200)
+        self.assertTrue(Prato.objects.filter(pk=prato.pk).exists())
+
+    def test_transicoes_da_cozinha(self):
+        comanda = self._comanda_com_item('6.00')
+        item = comanda.itens.get()
+        url = reverse('atendimento:cozinha')
+
+        self.client.post(url, {'item': item.pk, 'status': 'ENTREGUE'})
+        item.refresh_from_db()
+        self.assertEqual(item.status, ItemComanda.Status.PENDENTE)
+
+        self.client.post(url, {'item': item.pk, 'status': 'EM_PREPARO'})
+        item.refresh_from_db()
+        self.assertEqual(item.status, ItemComanda.Status.EM_PREPARO)

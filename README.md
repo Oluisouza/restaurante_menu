@@ -46,7 +46,8 @@ mesmo resultado.
 duas fontes para a mesma informação acabam divergindo.
 
 **Regras de negócio no model.** Validações, `fechar()` e `cancelar()` vivem
-nos models, não nas views. Assim valem em qualquer contexto que use o ORM.
+nos models, não nas views. Assim fechar() e cancelar() valem em qualquer contexto; 
+as validações de clean() só rodam em formulário.
 
 **Integridade garantida pelo banco.** `CheckConstraint` (item é prato *ou*
 combo; quantidade mínima 1), `UniqueConstraint` com `Lower()` (nomes únicos
@@ -113,6 +114,12 @@ Preencha o `.env` com as credenciais do PostgreSQL. **Inclua
 `DEBUG=True`** — sem essa variável o padrão é `False`, e com
 `ALLOWED_HOSTS = []` todas as requisições voltam `400 Bad Request`.
 
+Gere uma `SECRET_KEY` e cole no `.env`:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key as g; print(g())"
+```
+
 Crie um banco PostgreSQL vazio, com encoding **UTF8**, usando o nome que você
 colocou em `DB_NAME`. Depois:
 
@@ -132,10 +139,7 @@ duplicar registros. Útil para restaurar o cardápio depois de testes.
 python manage.py test
 ```
 
-Cobre um smoke test de todas as rotas (que teria pegado dois erros 500
-encontrados em revisão) e as regras de negócio principais: snapshot de preço,
-fechamento sem itens, desconto maior que a conta, arredondamento da taxa,
-congelamento do `total_pago`, ocupação da mesa e comandas individuais.
+Cobre um smoke test das rotas principais.
 
 ## Rotas
 
@@ -163,7 +167,7 @@ como decisão consciente de escopo, não como omissão.
 ### Fora do escopo do P1, previstas para o P2
 
 - **Não há autenticação.** Nenhuma tela exige login — apenas o `/admin/`.
-  Qualquer pessoa com acesso à rede pode operar o sistema. Autenticação e
+  Qualquer pessoa com acesso à máquina pode operar o sistema. Autenticação e
   papéis (atendente, cozinha, gerente) são requisito do P2.
 - **Sem tempo real.** A tela da cozinha exige recarga manual. O P2 prevê SSE.
 - **Um restaurante por instalação.** Multi-restaurante é requisito do P2.
@@ -171,10 +175,12 @@ como decisão consciente de escopo, não como omissão.
 
 ### Decisões conscientes
 
-- **O Admin contorna as regras do model.** `fechar()` e `cancelar()` não são
-  acionados pelo Admin, onde `status` e `total_pago` são editáveis. É
-  aceitável porque o Admin é ferramenta de manutenção, não de operação — mas
-  significa que ele pode produzir estados que a aplicação recusaria.
+- **O Admin contorna as regras do model.** O `status` da comanda é editável,
+  então dá para marcá-la como fechada sem passar por `fechar()`, com
+  `total_pago` e `fechada_em` vazios. As ações "Marcar como…" alteram o status
+  dos itens com `update()`, ignorando a máquina de estados e o bloqueio de
+  comanda fechada. No inline, o preço digitado é recapturado se o produto for
+  trocado.
 - **Exclusão física de itens.** Remover um item apaga a linha, sem histórico
   de quem removeu ou quando. Auditoria exigiria soft delete e registro de
   usuário, o que depende da autenticação acima.
@@ -185,6 +191,12 @@ como decisão consciente de escopo, não como omissão.
   comandas já fechadas.
 - **Adicionais existem no modelo, mas não têm tela.** `ItemAdicional` é
   gerenciável apenas pelo Admin.
+- **Itens já enviados à cozinha podem ser removidos ou editados.** O atendente
+  consegue remover um item em preparo ou entregue, ou trocar o produto dele,
+  sem que a cozinha seja avisada. Restringir isso exige papéis (quem pode
+  estornar), o que depende da autenticação.
+- **Itens cancelados não aparecem na tela da comanda.** Saem do total e da
+  lista; o registro só é visível no Admin.
 
 ### Limitações técnicas assumidas
 
@@ -206,6 +218,16 @@ como decisão consciente de escopo, não como omissão.
   de deploy é assunto da Aula 18.
 - **Classes CSS de etiqueta reaproveitadas** com nomes semanticamente errados
   (`FECHADA` para "disponível"). Deveriam ser `.positivo` e `.negativo`.
+- **Validações de `clean()` só rodam em formulários.** Desconto negativo e
+  comanda de mesa sem mesa são recusados pelas telas, mas não pelo ORM nem
+  pelo banco. Via shell é possível criar esses estados, e uma comanda de mesa
+  sem mesa quebra a tela de fechamento. A garantia real exige `CheckConstraint`.
+- **Nome de combo não é único.** A unicidade ignorando maiúsculas existe só em
+  categoria e prato.
+- **`ALLOWED_HOSTS` vazio.** Em desenvolvimento o sistema só responde em
+  `localhost`; o acesso por outro aparelho da rede recebe 400.
+- **Entradas forjadas não são validadas.** Um POST montado à mão com id não
+  numérico gera 500, e o PDV aceita lançar um adicional como item avulso.
 
 ## Origem
 

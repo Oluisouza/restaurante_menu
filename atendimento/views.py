@@ -92,6 +92,10 @@ def _ajustar_item(request, comanda, acao):
     item = get_object_or_404(ItemComanda, pk=request.POST.get('item'), comanda=comanda)
     descricao = item.descricao_produto
 
+    if acao != 'remover' and item.status != ItemComanda.Status.PENDENTE:
+        messages.error(request, 'Este item já foi para a cozinha. Lance o produto de novo.')
+        return
+
     if acao == 'incrementar':
         item.quantidade += 1
         item.save(update_fields=['quantidade'])

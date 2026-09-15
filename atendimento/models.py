@@ -222,12 +222,22 @@ class ItemComanda(models.Model):
         if bool(self.prato) == bool(self.combo):
             raise ValidationError('Informe exatamente um: prato ou combo.')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        if 'prato_id' in field_names and 'combo_id' in field_names:
+            instance._produto_carregado = (instance.prato_id, instance.combo_id)
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        super().refresh_from_db(using, fields, from_queryset)
         self._produto_carregado = (self.prato_id, self.combo_id)
 
     def save(self, *args, **kwargs):
-        produto_mudou = (self.prato_id, self.combo_id) != self._produto_carregado
+        carregado = getattr(self, '_produto_carregado', None)
+        produto_mudou = (
+            carregado is not None and (self.prato_id, self.combo_id) != carregado
+        )
         if self.produto and (self.preco_unitario is None or produto_mudou):
             self.preco_unitario = self.produto.preco
         super().save(*args, **kwargs)

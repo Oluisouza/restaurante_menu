@@ -22,7 +22,12 @@
 
 <h3>Conferência</h3>
 <table>
-    <tr><th>Item</th><th class="direita">Qtd</th><th class="direita">Unit.</th><th class="direita">Total</th></tr>
+    <tr>
+        <th>Item</th>
+        <th class="direita">Qtd</th>
+        <th class="direita">Unit.</th>
+        <th class="direita">Total</th>
+    </tr>
     {% for item in itens %}
     <tr>
         <td>
@@ -34,7 +39,9 @@
         <td class="direita">R$ {{ item.total|floatformat:2 }}</td>
     </tr>
     {% empty %}
-    <tr><td colspan="4" class="vazio">Nenhum item lançado.</td></tr>
+    <tr>
+        <td colspan="4" class="vazio">Nenhum item lançado.</td>
+    </tr>
     {% endfor %}
 </table>
 
@@ -66,43 +73,47 @@
 </div>
 
 <script>
-(function () {
-    const caixa = document.getElementById('previa');
-    if (!caixa) return;
+    (function () {
+        const caixa = document.getElementById('previa');
+        if (!caixa) return;
 
-    const subtotal = parseFloat(caixa.dataset.subtotal);
-    const campoTaxa = document.getElementById('id_taxa_servico');
-    const campoDesconto = document.getElementById('id_desconto');
+        const subtotal = parseFloat(caixa.dataset.subtotal);
+        const campoTaxa = document.getElementById('id_taxa_servico');
+        const campoDesconto = document.getElementById('id_desconto');
 
-    const linhaTaxa = document.getElementById('linha-taxa');
-    const linhaDesconto = document.getElementById('linha-desconto');
-    const valorTaxa = document.getElementById('valor-taxa');
-    const valorDesconto = document.getElementById('valor-desconto');
-    const valorTotal = document.getElementById('valor-total');
+        const linhaTaxa = document.getElementById('linha-taxa');
+        const linhaDesconto = document.getElementById('linha-desconto');
+        const valorTaxa = document.getElementById('valor-taxa');
+        const valorDesconto = document.getElementById('valor-desconto');
+        const valorTotal = document.getElementById('valor-total');
 
-    function moeda(centavos) {
-        return 'R$ ' + (centavos / 100).toFixed(2).replace('.', ',');
-    }
+        function moeda(centavos) {
+            return 'R$ ' + (centavos / 100).toFixed(2).replace('.', ',');
+        }
 
-    function recalcular() {
-        const subtotalCentavos = Math.round(subtotal * 100);
-        const cobraTaxa = campoTaxa && campoTaxa.checked;
-        const taxaCentavos = cobraTaxa ? Math.round(subtotalCentavos / 10) : 0;
+        function recalcular() {
+            const subtotalCentavos = Math.round(subtotal * 100);
+            const cobraTaxa = campoTaxa && campoTaxa.checked;
+            const taxaCentavos = cobraTaxa ? Math.round(subtotalCentavos / 10) : 0;
 
-        let desconto = parseFloat((campoDesconto.value || '0').replace(',', '.'));
-        if (isNaN(desconto) || desconto < 0) desconto = 0;
-        const descontoCentavos = Math.round(desconto * 100);
+            let desconto = parseFloat((campoDesconto.value || '0').replace(',', '.'));
+            if (isNaN(desconto) || desconto < 0) desconto = 0;
+            const descontoCentavos = Math.round(desconto * 100);
 
-        linhaTaxa.style.display = cobraTaxa ? 'flex' : 'none';
-        valorTaxa.textContent = moeda(taxaCentavos);
+            linhaTaxa.style.display = cobraTaxa ? 'flex' : 'none';
+            valorTaxa.textContent = moeda(taxaCentavos);
 
-        linhaDesconto.style.display = descontoCentavos > 0 ? 'flex' : 'none';
-        valorDesconto.textContent = '− ' + moeda(descontoCentavos);
+            linhaDesconto.style.display = descontoCentavos > 0 ? 'flex' : 'none';
+            valorDesconto.textContent = '− ' + moeda(descontoCentavos);
 
-        valorTotal.textContent = moeda(
-            Math.max(subtotalCentavos + taxaCentavos - descontoCentavos, 0)
-        );
-    }
-})();
+            valorTotal.textContent = moeda(
+                Math.max(subtotalCentavos + taxaCentavos - descontoCentavos, 0)
+            );
+        }
+
+        if (campoTaxa) campoTaxa.addEventListener('change', recalcular);
+        if (campoDesconto) campoDesconto.addEventListener('input', recalcular);
+        recalcular();
+    })();
 </script>
 {% endblock %}
