@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -90,12 +90,11 @@ class Comanda(models.Model):
             raise ValidationError({'desconto': 'Desconto não pode ser negativo.'})
 
     def save(self, *args, **kwargs):
-        if not self.codigo:
-            super().save(*args, **kwargs)  
-            self.codigo = f'CMD{self.id:05d}'
-            kwargs.pop('force_insert', None)
-            return super().save(update_fields=['codigo'])
-        return super().save(*args, **kwargs)
+        criando = self.pk is None
+        super().save(*args, **kwargs)
+        if criando and not self.codigo:
+            self.codigo = f'CMD{self.pk:05d}'
+            super().save(update_fields=['codigo'])
 
     @property
     def itens_validos(self):
@@ -109,7 +108,9 @@ class Comanda(models.Model):
     def valor_taxa_servico(self):
         if not self.taxa_servico:
             return Decimal('0.00')
-        return (self.subtotal * Decimal('0.10')).quantize(Decimal('0.01'))
+        return (self.subtotal * Decimal('0.10')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
 
     @property
     def total(self):
@@ -221,10 +222,16 @@ class ItemComanda(models.Model):
         if bool(self.prato) == bool(self.combo):
             raise ValidationError('Informe exatamente um: prato ou combo.')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._produto_carregado = (self.prato_id, self.combo_id)
+
     def save(self, *args, **kwargs):
-        if self.preco_unitario is None and self.produto:
+        produto_mudou = (self.prato_id, self.combo_id) != self._produto_carregado
+        if self.produto and (self.preco_unitario is None or produto_mudou):
             self.preco_unitario = self.produto.preco
         super().save(*args, **kwargs)
+        self._produto_carregado = (self.prato_id, self.combo_id)
 
 class ItemAdicional(models.Model):
     item_comanda = models.ForeignKey(
