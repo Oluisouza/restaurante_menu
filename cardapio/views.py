@@ -51,8 +51,8 @@ def excluir_prato(request, pk):
         except ProtectedError:
             messages.error(
                 request,
-                f'{nome} não pode ser excluído porque já foi usado em comandas ou combos'
-                f'marque como indisponível',
+                f'{nome} não pode ser excluído porque já foi usado em comandas ou combos. '
+                f'marque como indisponível. ',
             )
         else:
             messages.success(request, f'{nome} excluído do cardápio')
