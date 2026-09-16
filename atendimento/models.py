@@ -16,6 +16,13 @@ class Mesa(models.Model):
         verbose_name = "mesa"
         verbose_name_plural = "mesas"
         ordering = ['identificacao']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(capacidade__gte=1),
+                name='mesa_capacidade_minima',
+                violation_error_message='A mesa precisa ter ao menos um lugar.',
+            ),
+        ]
 
     def __str__(self):
         return f'Mesa {self.identificacao}'
