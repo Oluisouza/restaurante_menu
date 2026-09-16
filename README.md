@@ -7,7 +7,7 @@ dados assume café.
 
 **Disciplina:** Laboratório de Programação Full Stack
 **Tema:** 09 — Cardápio Digital
-**Stack:** Django 5.2 · PostgreSQL 17+ · Django Templates (MPA)
+**Stack:** Django 5.2 · PostgreSQL 17+ · Django Templates (MPA) · CSS Proprio
 
 ---
 
@@ -219,8 +219,6 @@ como decisão consciente de escopo, não como omissão.
   `Paginator`.
 - **Três FKs sem `related_name`** (`ItemComanda.prato`, `ItemComanda.combo` e
   `ItemAdicional.prato`), o que obriga o acesso reverso `prato.itemcomanda_set` e `combo.itemcomanda_set`.
-- **Sem `STATIC_ROOT`**, e a mídia só é servida com `DEBUG=True`. Configuração
-  de deploy é assunto da Aula 18.
 - **Classes CSS de etiqueta reaproveitadas** com nomes semanticamente errados
   (`FECHADA` para "disponível"). Deveriam ser `.positivo` e `.negativo`.
 - **`ALLOWED_HOSTS` vazio.** Em desenvolvimento o sistema só responde em
