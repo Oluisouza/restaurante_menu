@@ -161,7 +161,7 @@ def fechar_comanda(request, pk):
     contexto = {
         'comanda': comanda,
         'form': form,
-        'itens': comanda.itens_validos.select_related('prato', 'combo'),
+        'itens': comanda.itens_validos.select_related('prato', 'combo').prefetch_related('adicionais__prato'),
         'nao_entregues': nao_entregues,
     }
     return render(request, 'atendimento/fechar_comanda.html', contexto)
@@ -243,5 +243,7 @@ def cozinha(request):
 
         return redirect('atendimento:cozinha')
 
-    itens = (ItemComanda.objects.filter(comanda__status=Comanda.Status.ABERTA).exclude(status__in=[ItemComanda.Status.ENTREGUE, ItemComanda.Status.CANCELADO]).select_related('comanda', 'comanda__mesa', 'prato', 'combo').order_by('criado_em'))
+    itens = (
+        ItemComanda.objects.filter(comanda__status=Comanda.Status.ABERTA).exclude(status__in=[ItemComanda.Status.ENTREGUE, ItemComanda.Status.CANCELADO]).select_related('comanda', 'comanda__mesa', 'prato', 'combo').prefetch_related('adicionais__prato').order_by('criado_em')
+    )
     return render(request, 'atendimento/cozinha.html', {'itens': itens})

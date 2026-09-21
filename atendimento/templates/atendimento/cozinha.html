@@ -15,6 +15,7 @@
     <tr>
         <td>
             <strong>{{ item.descricao_produto }}</strong>
+            {% for adicional in item.adicionais.all %}<br><small>+ {{ adicional.prato.nome }}</small>{% endfor %}
             {% if item.observacao %}<br><small>⚠ {{ item.observacao }}</small>{% endif %}
         </td>
         <td>

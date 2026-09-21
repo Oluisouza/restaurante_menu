@@ -32,6 +32,9 @@
     <tr>
         <td>
             {{ item.descricao_produto }}
+            {% for adicional in item.adicionais.all %}
+            <br><small>+ {{ adicional.prato.nome }} (R$ {{ adicional.preco_unitario|floatformat:2 }})</small>
+            {% endfor %}
             {% if item.observacao %}<br><small>{{ item.observacao }}</small>{% endif %}
         </td>
         <td class="direita">{{ item.quantidade }}</td>
