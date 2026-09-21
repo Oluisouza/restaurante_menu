@@ -7,6 +7,7 @@ app_name = 'atendimento'
 urlpatterns = [
     path('', views.salao, name='salao'),
     path('cozinha/', views.cozinha, name='cozinha'),
+    path('resumo/', views.resumo, name='resumo'),
 
     path('comandas/', views.lista_comandas, name='lista_comandas'),
     path('comandas/nova/<str:tipo>/', views.nova_comanda, name='nova_comanda'),

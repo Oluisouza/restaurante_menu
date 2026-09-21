@@ -32,6 +32,7 @@ class RotasTest(TestCase):
             'atendimento:salao',
             'atendimento:lista_comandas',
             'atendimento:cozinha',
+            'atendimento:resumo',
             'cardapio:lista_cardapio',
             'cardapio:lista_pratos',
             'cardapio:novo_prato',
@@ -228,3 +229,146 @@ class ConstraintsTest(TestCase):
         Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Bruno')
         Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Carla')
         self.assertEqual(self.mesa.comandas_abertas.count(), 2)
+
+class ResumoTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        cls.espresso = Prato.objects.create(
+            nome='Espresso', preco=Decimal('6.00'), categoria=cls.cat
+        )
+        cls.url = reverse('atendimento:resumo')
+
+    def _fechada(self, quantidade, forma=Comanda.FormaPagamento.PIX):
+        comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='x')
+        ItemComanda.objects.create(comanda=comanda, prato=self.espresso, quantidade=quantidade)
+        comanda.fechar(forma)
+        return comanda
+
+    def test_dia_sem_vendas(self):
+        resposta = self.client.get(self.url)
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.context['totais']['quantidade'], 0)
+        self.assertContains(resposta, 'Nenhuma venda neste dia')
+
+    def test_soma_so_comandas_fechadas(self):
+        self._fechada(2)
+        self._fechada(1)
+        aberta = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='a')
+        ItemComanda.objects.create(comanda=aberta, prato=self.espresso, quantidade=10)
+        cancelada = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='c')
+        ItemComanda.objects.create(comanda=cancelada, prato=self.espresso, quantidade=10)
+        cancelada.cancelar()
+        resposta = self.client.get(self.url)
+        self.assertEqual(resposta.context['totais']['faturamento'], Decimal('18.00'))
+        self.assertEqual(resposta.context['totais']['quantidade'], 2)
+        self.assertEqual(resposta.context['canceladas'], 1)
+
+    def test_mais_vendidos_soma_as_quantidades(self):
+        self._fechada(2)
+        comanda = self._fechada(3)
+        cancelado = ItemComanda.objects.create(
+            comanda=comanda, prato=self.espresso, quantidade=7
+        )
+        ItemComanda.objects.filter(pk=cancelado.pk).update(status=ItemComanda.Status.CANCELADO)
+        linha = self.client.get(self.url).context['mais_vendidos'][0]
+        self.assertEqual(linha['prato__nome'], 'Espresso')
+        self.assertEqual(linha['unidades'], 5)
+
+    def test_data_invalida_cai_em_hoje(self):
+        for data in ['abc', '2026-13-45', '']:
+            with self.subTest(data=data):
+                resposta = self.client.get(self.url, {'data': data})
+                self.assertEqual(resposta.status_code, 200)
+                self.assertTrue(resposta.context['eh_hoje'])
+
+class PersonalizarItemTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        cls.adic = Categoria.objects.create(nome='Adicionais', ordem=9, eh_adicional=True)
+        cls.espresso = Prato.objects.create(
+            nome='Espresso', preco=Decimal('6.00'), categoria=cls.cat
+        )
+        cls.leite = Prato.objects.create(
+            nome='Leite vegetal', preco=Decimal('3.00'), categoria=cls.adic
+        )
+        cls.mesa = Mesa.objects.create(identificacao='01', capacidade=4)
+
+    def setUp(self):
+        self.comanda = Comanda.objects.create(
+            tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Ana'
+        )
+        self.url = reverse('atendimento:lancar_item', args=[self.comanda.pk])
+
+    def _tem_painel(self, resposta):
+        return b'name="acao" value="personalizar"' in resposta.content
+
+    def test_adicional_entra_no_total_com_snapshot(self):
+        self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
+        item = self.comanda.itens.get()
+        self.client.post(self.url, {
+            'acao': 'personalizar', 'item': item.pk, 'quantidade': 2,
+            'observacao': 'sem açúcar', 'adicionais_escolhidos': [self.leite.pk],
+        })
+        item.refresh_from_db()
+        self.assertEqual(item.observacao, 'sem açúcar')
+        self.assertEqual(item.total, Decimal('18.00'))
+
+        self.leite.preco = Decimal('99.00')
+        self.leite.save()
+        item.refresh_from_db()
+        self.assertEqual(item.total, Decimal('18.00'))
+
+    def test_item_personalizado_nao_agrupa(self):
+        self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
+        item = self.comanda.itens.get()
+        self.client.post(self.url, {
+            'acao': 'personalizar', 'item': item.pk, 'quantidade': 1,
+            'observacao': '', 'adicionais_escolhidos': [self.leite.pk],
+        })
+        self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
+        self.assertEqual(self.comanda.itens.count(), 2)
+
+    def test_remover_adicional_preserva_o_que_fica(self):
+        chantilly = Prato.objects.create(
+            nome='Chantilly', preco=Decimal('3.50'), categoria=self.adic
+        )
+        self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
+        item = self.comanda.itens.get()
+        for escolhidos in ([self.leite.pk, chantilly.pk], [self.leite.pk]):
+            self.client.post(self.url, {
+                'acao': 'personalizar', 'item': item.pk, 'quantidade': 1,
+                'observacao': '', 'adicionais_escolhidos': escolhidos,
+            })
+        item.refresh_from_db()
+        self.assertEqual(
+            list(item.adicionais.values_list('prato__nome', flat=True)), ['Leite vegetal']
+        )
+
+    def test_item_na_cozinha_nao_e_personalizavel(self):
+        self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
+        item = self.comanda.itens.get()
+        ItemComanda.objects.filter(pk=item.pk).update(status=ItemComanda.Status.PRONTO)
+        self.client.post(self.url, {
+            'acao': 'personalizar', 'item': item.pk, 'quantidade': 9, 'observacao': 'x',
+        })
+        item.refresh_from_db()
+        self.assertEqual(item.quantidade, 1)
+        self.assertEqual(item.observacao, '')
+        self.assertFalse(self._tem_painel(self.client.get(f'{self.url}?personalizar={item.pk}')))
+
+    def test_painel_so_abre_para_item_da_propria_comanda(self):
+        self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
+        proprio = self.comanda.itens.get()
+        outra = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Bruno')
+        alheio = ItemComanda.objects.create(comanda=outra, prato=self.espresso)
+
+        self.assertTrue(self._tem_painel(self.client.get(f'{self.url}?personalizar={proprio.pk}')))
+        for sufixo in [alheio.pk, 99999, 'abc', '']:
+            with self.subTest(sufixo=sufixo):
+                resposta = self.client.get(f'{self.url}?personalizar={sufixo}')
+                self.assertEqual(resposta.status_code, 200)
+                self.assertFalse(self._tem_painel(resposta))

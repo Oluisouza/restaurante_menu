@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Resumo de {{ dia|date:"d/m/Y" }} — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Resumo de {{ dia|date:"d/m/Y" }}{% if eh_hoje %} · hoje{% endif %}</h2>
+
+<form class="filtros" method="get">
+    <a href="?data={{ dia_anterior|date:'Y-m-d' }}" class="botao claro">← Anterior</a>
+    <input type="date" name="data" value="{{ dia|date:'Y-m-d' }}">
+    <button type="submit">Ver</button>
+    {% if not eh_hoje %}
+    <a href="?data={{ dia_seguinte|date:'Y-m-d' }}" class="botao claro">Seguinte →</a>
+    {% endif %}
+</form>
+
+<div class="totais">
+    <div><span>Comandas fechadas</span><span>{{ totais.quantidade }}</span></div>
+    <div><span>Ticket médio</span><span>R$ {{ totais.ticket_medio|default:0|floatformat:2 }}</span></div>
+    <div><span>Descontos concedidos</span><span>R$ {{ totais.descontos|default:0|floatformat:2 }}</span></div>
+    <div><span>Comandas canceladas</span><span>{{ canceladas }}</span></div>
+    <div class="final"><span>Faturamento</span><span>R$ {{ totais.faturamento|default:0|floatformat:2 }}</span></div>
+</div>
+{% if eh_hoje %}<p><small>{{ abertas_agora }} comanda{{ abertas_agora|pluralize }} ainda aberta{{ abertas_agora|pluralize }} — não entra{{ abertas_agora|pluralize:"m" }} no faturamento até fechar.</small></p>{% endif %}
+
+<h3>Por forma de pagamento</h3>
+<table>
+    <tr><th>Forma</th><th class="direita">Comandas</th><th class="direita">Total</th></tr>
+    {% for linha in por_pagamento %}
+    <tr>
+        <td>{{ linha.rotulo }}</td>
+        <td class="direita">{{ linha.quantidade }}</td>
+        <td class="direita">R$ {{ linha.total|floatformat:2 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="3" class="vazio">Nenhuma venda neste dia.</td></tr>
+    {% endfor %}
+</table>
+
+<h3>Mais vendidos</h3>
+<table>
+    <tr><th>Item</th><th class="direita">Unidades</th></tr>
+    {% for linha in mais_vendidos %}
+    <tr>
+        <td>{{ linha.prato__nome|default:linha.combo__nome }}</td>
+        <td class="direita">{{ linha.unidades }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="2" class="vazio">Nenhum item vendido neste dia.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}

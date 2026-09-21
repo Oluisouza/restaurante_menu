@@ -3,7 +3,7 @@ from django.db.models import Q
 
 from cardapio.models import Combo, Prato
 
-from .models import Comanda, ItemComanda, Mesa
+from .models import Comanda, ItemAdicional, ItemComanda, Mesa
 
 class ComandaForm(forms.ModelForm):
 
@@ -70,6 +70,50 @@ class ItemComandaForm(forms.ModelForm):
         self.fields['combo'].queryset = Combo.objects.filter(combos).distinct()
         self.fields['combo'].required = False
         self.fields['combo'].empty_label = '— ou escolha um combo —'
+
+class PersonalizarItemForm(forms.ModelForm):
+    adicionais_escolhidos = forms.ModelMultipleChoiceField(
+        queryset=Prato.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label='Adicionais',
+    )
+
+    class Meta:
+        model = ItemComanda
+        fields = ['quantidade', 'observacao']
+        labels = {'quantidade': 'Quantidade', 'observacao': 'Observação'}
+        widgets = {
+            'observacao': forms.TextInput(
+                attrs={'placeholder': 'Ex.: sem açúcar', 'autofocus': True}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['adicionais_escolhidos'].queryset = Prato.objects.filter(
+            disponivel=True, categoria__eh_adicional=True
+        )
+        if self.instance.pk:
+            self.initial['adicionais_escolhidos'] = list(
+                self.instance.adicionais.values_list('prato_id', flat=True)
+            )
+
+    def save(self, commit=True):
+        item = super().save(commit=commit)
+        if commit:
+            self.sincronizar_adicionais(item)
+        return item
+
+    def sincronizar_adicionais(self, item):
+        escolhidos = {p.pk: p for p in self.cleaned_data['adicionais_escolhidos']}
+        atuais = {a.prato_id: a for a in item.adicionais.all()}
+        for prato_id, adicional in atuais.items():
+            if prato_id not in escolhidos:
+                adicional.delete()
+        for prato_id, prato in escolhidos.items():
+            if prato_id not in atuais:
+                ItemAdicional.objects.create(item_comanda=item, prato=prato)
 
 class FechamentoForm(forms.ModelForm):
 

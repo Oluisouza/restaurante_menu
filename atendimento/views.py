@@ -2,9 +2,12 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import Http404
-from django.db.models import Prefetch
+from django.db.models import Avg, Count, Prefetch, Sum
+from django.utils import timezone
 
-from .forms import ComandaForm, ItemComandaForm, FechamentoForm
+from datetime import date, timedelta
+
+from .forms import ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm
 from .models import Comanda, Mesa, ItemComanda
 from cardapio.models import Categoria, Combo, Prato
 
@@ -78,7 +81,9 @@ def _adicionar_produto(request, comanda):
         messages.error(request, 'Nenhum produto informado.')
         return
 
-    existente = comanda.itens.filter(status=ItemComanda.Status.PENDENTE, observacao='', **chave).first()
+    existente = comanda.itens.filter(
+        status=ItemComanda.Status.PENDENTE, observacao='', adicionais__isnull=True, **chave
+    ).first()
 
     if existente:
         existente.quantidade += 1
@@ -106,6 +111,23 @@ def _ajustar_item(request, comanda, acao):
         item.delete()
         messages.success(request, f'{descricao} removido.')
 
+def _personalizar_item(request, comanda):
+    item = get_object_or_404(
+        ItemComanda, pk=request.POST.get('item'), comanda=comanda
+    )
+    if item.status != ItemComanda.Status.PENDENTE:
+        messages.error(request, 'Este item já foi para a cozinha.')
+        return
+
+    form = PersonalizarItemForm(request.POST, instance=item)
+    if form.is_valid():
+        form.save()
+        messages.success(request, f'{item.descricao_produto} atualizado.')
+    else:
+        erros = '; '.join(m for lista in form.errors.values() for m in lista)
+        messages.error(request, erros)
+
+
 def lancar_item(request, pk):
     comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
 
@@ -119,19 +141,34 @@ def lancar_item(request, pk):
             _adicionar_produto(request, comanda)
         elif acao in ('incrementar', 'decrementar', 'remover'):
             _ajustar_item(request, comanda, acao)
+        elif acao == 'personalizar':
+            _personalizar_item(request, comanda)
         else:
             messages.error(request, 'Ação desconhecida.')
         return redirect('atendimento:lancar_item', pk=comanda.pk)
 
     categorias = (
-        Categoria.objects.filter(eh_adicional=False).prefetch_related(Prefetch('pratos', queryset=Prato.objects.filter(disponivel=True)))
+        Categoria.objects.filter(eh_adicional=False)
+        .prefetch_related(Prefetch('pratos', queryset=Prato.objects.filter(disponivel=True)))
     )
+
+    item_personalizando = None
+    form_personalizar = None
+    alvo = request.GET.get('personalizar', '')
+    if alvo.isdigit():
+        item_personalizando = comanda.itens.filter(
+            pk=alvo, status=ItemComanda.Status.PENDENTE
+        ).first()
+        if item_personalizando:
+            form_personalizar = PersonalizarItemForm(instance=item_personalizando)
 
     contexto = {
         'comanda': comanda,
         'categorias': categorias,
         'combos': Combo.objects.filter(disponivel=True).prefetch_related('itens__prato'),
-        'itens': comanda.itens_validos.select_related('prato', 'combo'),
+        'itens': comanda.itens_validos.select_related('prato', 'combo').prefetch_related('adicionais__prato'),
+        'item_personalizando': item_personalizando,
+        'form_personalizar': form_personalizar,
     }
     return render(request, 'atendimento/pdv.html', contexto)
 
@@ -247,3 +284,58 @@ def cozinha(request):
         ItemComanda.objects.filter(comanda__status=Comanda.Status.ABERTA).exclude(status__in=[ItemComanda.Status.ENTREGUE, ItemComanda.Status.CANCELADO]).select_related('comanda', 'comanda__mesa', 'prato', 'combo').prefetch_related('adicionais__prato').order_by('criado_em')
     )
     return render(request, 'atendimento/cozinha.html', {'itens': itens})
+
+def _data_do_resumo(request):
+    texto = request.GET.get('data', '')
+    try:
+        return date.fromisoformat(texto)
+    except ValueError:
+        return timezone.localdate()
+
+
+def resumo(request):
+    dia = _data_do_resumo(request)
+
+    fechadas = Comanda.objects.filter(
+        status=Comanda.Status.FECHADA, fechada_em__date=dia
+    )
+    totais = fechadas.aggregate(
+        faturamento=Sum('total_pago'),
+        quantidade=Count('id'),
+        ticket_medio=Avg('total_pago'),
+        descontos=Sum('desconto'),
+    )
+
+    rotulos = dict(Comanda.FormaPagamento.choices)
+    por_pagamento = [
+        {**linha, 'rotulo': rotulos.get(linha['forma_pagamento'], '—')}
+        for linha in (
+            fechadas.values('forma_pagamento')
+            .annotate(total=Sum('total_pago'), quantidade=Count('id'))
+            .order_by('-total')
+        )
+    ]
+
+    mais_vendidos = (
+        ItemComanda.objects
+        .filter(comanda__in=fechadas)
+        .exclude(status=ItemComanda.Status.CANCELADO)
+        .values('prato__nome', 'combo__nome')
+        .annotate(unidades=Sum('quantidade'))
+        .order_by('-unidades')[:10]
+    )
+
+    contexto = {
+        'dia': dia,
+        'dia_anterior': dia - timedelta(days=1),
+        'dia_seguinte': dia + timedelta(days=1),
+        'eh_hoje': dia == timezone.localdate(),
+        'totais': totais,
+        'por_pagamento': por_pagamento,
+        'mais_vendidos': mais_vendidos,
+        'canceladas': Comanda.objects.filter(
+            status=Comanda.Status.CANCELADA, fechada_em__date=dia
+        ).count(),
+        'abertas_agora': Comanda.objects.filter(status=Comanda.Status.ABERTA).count(),
+    }
+    return render(request, 'atendimento/resumo.html', contexto)

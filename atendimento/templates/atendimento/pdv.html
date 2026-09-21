@@ -51,9 +51,14 @@
         <div class="linha-item">
             <div class="nome">
                 {{ item.descricao_produto }}
+                {% for adicional in item.adicionais.all %}
+                    <small>+ {{ adicional.prato.nome }}</small>
+                {% endfor %}
                 {% if item.observacao %}<small>{{ item.observacao }}</small>{% endif %}
                 {% if item.status != 'PENDENTE' %}
                     <small>{{ item.get_status_display }}</small>
+                {% else %}
+                    <a href="?personalizar={{ item.pk }}" class="link-personalizar"><small>personalizar</small></a>
                 {% endif %}
             </div>
             <form method="post" class="qtd">
@@ -82,9 +87,21 @@
             {% endif %}
         </div>
 
-        <p style="margin-top:.75rem"><small>
-            Para adicionar observação, use <em>editar</em> na tela da comanda.
-        </small></p>
+        {% if item_personalizando %}
+        <div class="painel-personalizar">
+            <h4>{{ item_personalizando.descricao_produto }}</h4>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="personalizar">
+                <input type="hidden" name="item" value="{{ item_personalizando.pk }}">
+                {{ form_personalizar.as_p }}
+                <div class="acoes">
+                    <button type="submit" class="botao">Salvar</button>
+                    <a href="{% url 'atendimento:lancar_item' comanda.pk %}" class="botao claro">Cancelar</a>
+                </div>
+            </form>
+        </div>
+        {% endif %}
     </div>
 
 </div>

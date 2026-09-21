@@ -431,3 +431,15 @@ button {
     font-size: 1.3rem;
     font-weight: 700;
 }
+
+.link-personalizar { color: #8a6a4a; text-decoration: none; }
+.link-personalizar:hover { text-decoration: underline; }
+.painel-personalizar { background: #f7f1e8; border: 1px solid #d8c6ad; border-radius: 8px;
+                       padding: 1rem; margin-top: 1rem; }
+.painel-personalizar h4 { margin-bottom: .6rem; font-size: .95rem; }
+.painel-personalizar p { margin-bottom: .7rem; }
+.painel-personalizar label { font-weight: 600; font-size: .85rem; display: block; margin-bottom: .2rem; }
+.painel-personalizar input[type=text], .painel-personalizar input[type=number] { width: 100%; }
+.painel-personalizar ul { list-style: none; }
+.painel-personalizar ul label { font-weight: 400; display: flex; align-items: center; gap: .4rem; }
+.painel-personalizar ul input { width: auto; }
