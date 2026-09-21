@@ -1,12 +1,15 @@
 from decimal import Decimal
 
-from django.test import TestCase
+from django.contrib import admin
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 
 from cardapio.models import Categoria, Prato
 
+from .admin import ComandaAdmin, ItemComandaAdmin
 from .models import Comanda, ItemComanda, Mesa
 
 
@@ -372,3 +375,79 @@ class PersonalizarItemTest(TestCase):
                 resposta = self.client.get(f'{self.url}?personalizar={sufixo}')
                 self.assertEqual(resposta.status_code, 200)
                 self.assertFalse(self._tem_painel(resposta))
+
+
+class BlindagemTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        adic = Categoria.objects.create(nome='Adicionais', ordem=9, eh_adicional=True)
+        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        cls.leite = Prato.objects.create(nome='Leite vegetal', preco=Decimal('3.00'), categoria=adic)
+        cls.mesa = Mesa.objects.create(identificacao='01', capacidade=4)
+
+    def setUp(self):
+        self.comanda = Comanda.objects.create(
+            tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Ana'
+        )
+        self.pdv = reverse('atendimento:lancar_item', args=[self.comanda.pk])
+
+    def test_ids_forjados_dao_404(self):
+        casos = [
+            (self.pdv, {'acao': 'adicionar', 'prato': 'abc'}),
+            (self.pdv, {'acao': 'incrementar', 'item': 'abc'}),
+            (self.pdv, {'acao': 'personalizar', 'item': 'abc'}),
+            (reverse('atendimento:cozinha'), {'item': 'abc', 'status': 'PRONTO'}),
+        ]
+        for url, dados in casos:
+            with self.subTest(dados=dados):
+                self.assertEqual(self.client.post(url, dados).status_code, 404)
+
+    def test_adicional_nao_e_lancado_como_item(self):
+        resposta = self.client.post(self.pdv, {'acao': 'adicionar', 'prato': self.leite.pk})
+        self.assertEqual(resposta.status_code, 404)
+        self.assertEqual(self.comanda.itens.count(), 0)
+
+    def test_produto_esgotado_mostra_mensagem(self):
+        self.espresso.disponivel = False
+        self.espresso.save()
+        resposta = self.client.post(
+            self.pdv, {'acao': 'adicionar', 'prato': self.espresso.pk}, follow=True
+        )
+        self.assertContains(resposta, 'acabou de ficar indisponível')
+        self.assertEqual(self.comanda.itens.count(), 0)
+
+    def test_cancelar_comanda_fechada_redireciona(self):
+        ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso)
+        self.comanda.fechar(Comanda.FormaPagamento.PIX)
+        url = reverse('atendimento:cancelar_comanda', args=[self.comanda.pk])
+        self.assertRedirects(
+            self.client.get(url),
+            reverse('atendimento:detalhe_comanda', args=[self.comanda.pk]),
+        )
+
+    def _request_admin(self):
+        request = RequestFactory().get('/admin/')
+        request.user = User.objects.create_superuser('admin', 'a@a.com', 'senha')
+        return request
+
+    def test_admin_status_nunca_e_editavel(self):
+        request = self._request_admin()
+        campos = ComandaAdmin(Comanda, admin.site).get_readonly_fields(request, self.comanda)
+        self.assertIn('status', campos)
+        self.assertNotIn('responsavel', campos)
+
+    def test_admin_trava_comanda_fechada(self):
+        ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso)
+        self.comanda.fechar(Comanda.FormaPagamento.PIX)
+        request = self._request_admin()
+
+        comanda_admin = ComandaAdmin(Comanda, admin.site)
+        self.assertIn('responsavel', comanda_admin.get_readonly_fields(request, self.comanda))
+        self.assertFalse(comanda_admin.has_delete_permission(request, self.comanda))
+
+        item = self.comanda.itens.get()
+        item_admin = ItemComandaAdmin(ItemComanda, admin.site)
+        self.assertFalse(item_admin.has_change_permission(request, item))
+        self.assertFalse(item_admin.has_delete_permission(request, item))
