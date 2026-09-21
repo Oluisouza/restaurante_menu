@@ -67,18 +67,31 @@ def nova_comanda(request, tipo):
 
     return render(request, 'atendimento/form_comanda.html', contexto)
 
+def _id_valido(valor):
+    """Converte um id vindo do cliente; qualquer coisa que nao seja numero vira 404."""
+    if not (valor or '').isdigit():
+        raise Http404('Identificador inválido.')
+    return int(valor)
+
+
 def _adicionar_produto(request, comanda):
     prato_id = request.POST.get('prato')
     combo_id = request.POST.get('combo')
 
     if prato_id:
-        produto = get_object_or_404(Prato, pk=prato_id, disponivel=True)
+        produto = get_object_or_404(
+            Prato, pk=_id_valido(prato_id), categoria__eh_adicional=False
+        )
         chave = {'prato': produto, 'combo': None}
     elif combo_id:
-        produto = get_object_or_404(Combo, pk=combo_id, disponivel=True)
+        produto = get_object_or_404(Combo, pk=_id_valido(combo_id))
         chave = {'prato': None, 'combo': produto}
     else:
         messages.error(request, 'Nenhum produto informado.')
+        return
+
+    if not produto.disponivel:
+        messages.error(request, f'{produto.nome} acabou de ficar indisponível.')
         return
 
     existente = comanda.itens.filter(
@@ -94,7 +107,9 @@ def _adicionar_produto(request, comanda):
     messages.success(request, f'{produto.nome} lançado.')
 
 def _ajustar_item(request, comanda, acao):
-    item = get_object_or_404(ItemComanda, pk=request.POST.get('item'), comanda=comanda)
+    item = get_object_or_404(
+        ItemComanda, pk=_id_valido(request.POST.get('item')), comanda=comanda
+    )
     descricao = item.descricao_produto
 
     if acao != 'remover' and item.status != ItemComanda.Status.PENDENTE:
@@ -113,7 +128,7 @@ def _ajustar_item(request, comanda, acao):
 
 def _personalizar_item(request, comanda):
     item = get_object_or_404(
-        ItemComanda, pk=request.POST.get('item'), comanda=comanda
+        ItemComanda, pk=_id_valido(request.POST.get('item')), comanda=comanda
     )
     if item.status != ItemComanda.Status.PENDENTE:
         messages.error(request, 'Este item já foi para a cozinha.')
@@ -206,6 +221,10 @@ def fechar_comanda(request, pk):
 def cancelar_comanda(request, pk):
     comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
 
+    if not comanda.esta_aberta:
+        messages.warning(request, f'A comanda {comanda.codigo} já foi encerrada.')
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+
     if request.method == 'POST':
         try:
             comanda.cancelar()
@@ -263,7 +282,7 @@ def cozinha(request):
 
     if request.method == 'POST':
         item = get_object_or_404(
-            ItemComanda.objects.select_related('comanda'), pk=request.POST.get('item')
+            ItemComanda.objects.select_related('comanda'), pk=_id_valido(request.POST.get('item'))
         )
         novo_status = request.POST.get('status')
 
