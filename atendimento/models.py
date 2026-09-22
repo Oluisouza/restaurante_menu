@@ -202,6 +202,8 @@ class ItemComanda(models.Model):
 
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDENTE)
     criado_em = models.DateTimeField(auto_now_add=True)
+    motivo_cancelamento = models.CharField(max_length=200, blank=True)
+    cancelado_em = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         verbose_name = "item da comanda"
@@ -248,6 +250,23 @@ class ItemComanda(models.Model):
     def clean(self):
         if bool(self.prato) == bool(self.combo):
             raise ValidationError('Informe exatamente um: prato ou combo.')
+
+    @property
+    def esta_pendente(self):
+        return self.status == self.Status.PENDENTE
+
+    def cancelar(self, motivo):
+        motivo = (motivo or '').strip()
+        if not self.comanda.esta_aberta():
+            raise ValidationError('A comanda deste item já foi encerrada.')
+        if self.status == self.Status.CANCELADO:
+            raise ValidationError('Este item já foi cancelado.')
+        if not motivo:
+            raise ValidationError('Informe o motivo do cancelamento.')
+        self.status = self.Status.CANCELADO
+        self.motivo_cancelamento = motivo
+        self.cancelado_em = timezone.now()
+        self.save(update_fields=['status', 'motivo_cancelamento', 'cancelado_em'])
 
     @classmethod
     def from_db(cls, db, field_names, values):
