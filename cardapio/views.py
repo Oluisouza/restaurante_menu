@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.db.models import ProtectedError
+from django.db.models import ProtectedError, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import PratoForm
@@ -20,11 +20,24 @@ def lista_cardapio(request):
     return render(request, 'cardapio/lista_cardapio.html', contexto)
 
 def lista_pratos(request):
-    busca = request.GET.get('q', '')
-    pratos = Prato.objects.select_related('categoria')
+    busca = request.GET.get('q', '').strip()
+    categoria_id = request.GET.get('categoria', '')
+
+    filtros = Q()
     if busca:
-        pratos = pratos.filter(nome__icontains=busca)
-    return render(request, 'cardapio/lista_pratos.html', {'pratos': pratos, 'busca': busca})
+        filtros &= Q(nome__icontains=busca) | Q(descricao__icontains=busca)
+    if categoria_id.isdigit():
+        filtros &= Q(categoria_id=categoria_id)
+
+    pratos = Prato.objects.select_related('categoria').filter(filtros)
+
+    contexto = {
+        'pratos': pratos,
+        'busca': busca,
+        'categorias': Categoria.objects.all(),
+        'categoria_selecionada': categoria_id,
+    }
+    return render( request, 'cardapio/lista_pratos.html', contexto)
 
 def form_prato(request, pk=None):
     prato = get_object_or_404(Prato, pk=pk) if pk else None

@@ -10,12 +10,29 @@
 </div>
 
 <form class="filtros" method="get">
-    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar item...">
-    <button type="submit">Buscar</button>
+    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por nome ou descrição...">
+    <select name="categoria">
+        <option value="">Todas as categorias</option>
+        {% for categoria in categorias %}
+        <option value="{{ categoria.pk }}" {% if categoria.pk|stringformat:"s" == categoria_selecionada %}selected{% endif %}>
+            {{ categoria.nome }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit">Filtrar</button>
+    {% if busca or categoria_selecionada %}
+    <a href="{% url 'cardapio:lista_pratos' %}">limpar</a>
+    {% endif %}
 </form>
 
 <table>
-    <tr><th>Item</th><th>Categoria</th><th class="direita">Preço</th><th>Situação</th><th></th></tr>
+    <tr>
+        <th>Item</th>
+        <th>Categoria</th>
+        <th class="direita">Preço</th>
+        <th>Situação</th>
+        <th></th>
+    </tr>
     {% for prato in pratos %}
     <tr>
         <td>{{ prato.nome }}</td>
@@ -23,9 +40,9 @@
         <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
         <td>
             {% if prato.disponivel %}
-                <span class="etiqueta FECHADA">disponível</span>
+            <span class="etiqueta FECHADA">disponível</span>
             {% else %}
-                <span class="etiqueta CANCELADA">esgotado</span>
+            <span class="etiqueta CANCELADA">esgotado</span>
             {% endif %}
         </td>
         <td>
@@ -34,7 +51,15 @@
         </td>
     </tr>
     {% empty %}
-    <tr><td colspan="5" class="vazio">Nenhum item encontrado.</td></tr>
+    <tr>
+        <td colspan="5" class="vazio">
+            {% if busca or categoria_selecionada %}
+            Nenhum item encontrado com esses filtros.
+            {% else %}
+            Nenhum item cadastrado no cardápio.
+            {% endif %}
+        </td>
+    </tr>
     {% endfor %}
 </table>
 {% endblock %}
