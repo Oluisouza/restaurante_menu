@@ -41,3 +41,20 @@ class BuscaFiltroPratosTest(TestCase):
         resposta = self.client.get(self.url, {'q': 'pizza'})
         self.assertContains(resposta, 'Nenhum item encontrado com esses filtros')
         self.assertContains(resposta, 'value="pizza"')
+
+class VitrineFiltroTest(TestCase):
+    def setUp(self):
+        self.bebidas = Categoria.objects.create(nome='Bebidas', ordem=1)
+        self.doces = Categoria.objects.create(nome='Doces', ordem=2)
+        Prato.objects.create(nome='Café expresso', preco=Decimal('6.00'), categoria=self.bebidas)
+        Prato.objects.create(nome='Bolo de café', preco=Decimal('9.00'), categoria=self.doces)
+        self.url = reverse('cardapio:lista_cardapio')
+
+    def test_filtro_por_categoria_na_vitrine(self):
+        resposta = self.client.get(self.url, {'categoria': self.doces.pk})
+        self.assertContains(resposta, 'Bolo de café')
+        self.assertNotContains(resposta, 'Café expresso')
+
+    def test_vitrine_sem_resultado_mostra_mensagem(self):
+        resposta = self.client.get(self.url, {'q': 'pizza'})
+        self.assertContains(resposta, 'Nenhum item encontrado com esses filtros')

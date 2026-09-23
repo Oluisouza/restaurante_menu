@@ -6,25 +6,42 @@
 <h2>Cardápio</h2>
 
 <form class="filtros" method="get">
-    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar item...">
-    <button type="submit">Buscar</button>
+    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por nome ou descrição...">
+    <select name="categoria">
+        <option value="">Todas as categorias</option>
+        {% for categoria in categorias %}
+        <option value="{{ categoria.pk }}" {% if categoria.pk|stringformat:"s" == categoria_selecionada %}selected{% endif %}>
+            {{ categoria.nome }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit">Filtrar</button>
+    {% if busca or categoria_selecionada %}
+    <a href="{% url 'cardapio:lista_cardapio' %}">limpar</a>
+    {% endif %}
 </form>
 
-{% for categoria in categorias %}
-    <h3>{{ categoria.nome }}</h3>
+{% for secao in secoes %}
+    <h3>{{ secao.categoria.nome }}</h3>
     <table>
-        {% for prato in pratos %}
-            {% if prato.categoria_id == categoria.id %}
-            <tr>
-                <td>
-                    <strong>{{ prato.nome }}</strong>
-                    {% if prato.descricao %}<br><small>{{ prato.descricao }}</small>{% endif %}
-                </td>
-                <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
-            </tr>
-            {% endif %}
+        {% for prato in secao.pratos %}
+        <tr>
+            <td>
+                <strong>{{ prato.nome }}</strong>
+                {% if prato.descricao %}<br><small>{{ prato.descricao }}</small>{% endif %}
+            </td>
+            <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
+        </tr>
         {% endfor %}
     </table>
+{% empty %}
+    <p class="vazio">
+        {% if busca or categoria_selecionada %}
+            Nenhum item encontrado com esses filtros.
+        {% else %}
+            Nenhum item disponível no cardápio.
+        {% endif %}
+    </p>
 {% endfor %}
 
 <h3>Combos</h3>

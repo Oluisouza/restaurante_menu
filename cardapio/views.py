@@ -5,21 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from .forms import PratoForm
 from .models import Categoria, Combo, Prato
 
-def lista_cardapio(request):
-    busca = request.GET.get('q', '')
-    pratos = Prato.objects.filter(disponivel=True).select_related('categoria')
-    if busca:
-        pratos = pratos.filter(nome__icontains=busca)
-
-    contexto = {
-        'categorias': Categoria.objects.filter(eh_adicional=False), 
-        'pratos': pratos, 
-        'combos': Combo.objects.filter(disponivel=True).prefetch_related('itens__prato'), 
-        'busca': busca,
-    }
-    return render(request, 'cardapio/lista_cardapio.html', contexto)
-
-def lista_pratos(request):
+def filtrar_pratos(request, pratos):
     busca = request.GET.get('q', '').strip()
     categoria_id = request.GET.get('categoria', '')
 
@@ -29,15 +15,40 @@ def lista_pratos(request):
     if categoria_id.isdigit():
         filtros &= Q(categoria_id=categoria_id)
 
-    pratos = Prato.objects.select_related('categoria').filter(filtros)
+    return pratos.filter(filtros), busca, categoria_id
 
+def lista_cardapio(request):
+    pratos, busca, categoria_id = filtrar_pratos(
+        request, Prato.objects.filter(disponivel=True).select_related('categoria')
+    )
+    categorias = Categoria.objects.filter(eh_adicional=False)
+
+    secoes = []
+    for categoria in categorias:
+        itens = [prato for prato in pratos if prato.categoria_id == categoria.id]
+        if itens:
+            secoes.append({'categoria': categoria, 'pratos': itens})
+
+    contexto = {
+        'secoes': secoes,
+        'categorias': categorias,
+        'combos': Combo.objects.filter(disponivel=True).prefetch_related('itens__prato'),
+        'busca': busca,
+        'categoria_selecionada': categoria_id,
+    }
+    return render(request, 'cardapio/lista_cardapio.html', contexto)
+
+def lista_pratos(request):
+    pratos, busca, categoria_id = filtrar_pratos(
+        request, Prato.objects.select_related('categoria')
+    )
     contexto = {
         'pratos': pratos,
         'busca': busca,
         'categorias': Categoria.objects.all(),
         'categoria_selecionada': categoria_id,
     }
-    return render( request, 'cardapio/lista_pratos.html', contexto)
+    return render(request, 'cardapio/lista_pratos.html', contexto)
 
 def form_prato(request, pk=None):
     prato = get_object_or_404(Prato, pk=pk) if pk else None
