@@ -22,26 +22,26 @@
 </form>
 
 {% for secao in secoes %}
-    <h3>{{ secao.categoria.nome }}</h3>
-    <table>
-        {% for prato in secao.pratos %}
-        <tr>
-            <td>
-                <strong>{{ prato.nome }}</strong>
-                {% if prato.descricao %}<br><small>{{ prato.descricao }}</small>{% endif %}
-            </td>
-            <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+<h3>{{ secao.categoria.nome }}</h3>
+<table>
+    {% for prato in secao.pratos %}
+    <tr>
+        <td>
+            <strong>{{ prato.nome }}</strong>
+            {% if prato.descricao %}<br><small>{{ prato.descricao }}</small>{% endif %}
+        </td>
+        <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
+    </tr>
+    {% endfor %}
+</table>
 {% empty %}
-    <p class="vazio">
-        {% if busca or categoria_selecionada %}
-            Nenhum item encontrado com esses filtros.
-        {% else %}
-            Nenhum item disponível no cardápio.
-        {% endif %}
-    </p>
+<p class="vazio">
+    {% if busca or categoria_selecionada %}
+    Nenhum item encontrado com esses filtros.
+    {% else %}
+    Nenhum item disponível no cardápio.
+    {% endif %}
+</p>
 {% endfor %}
 
 <h3>Combos</h3>
@@ -53,10 +53,16 @@
             {% for item in combo.itens.all %}{{ item.quantidade }}× {{ item.prato.nome }}<br>{% endfor %}
         </small>
         <p>R$ {{ combo.preco|floatformat:2 }}
-           <small style="color:#5c8a3a">(economia de R$ {{ combo.economia|floatformat:2 }})</small></p>
+            <small style="color:#5c8a3a">(economia de R$ {{ combo.economia|floatformat:2 }})</small>
+        </p>
     </div>
     {% empty %}
-    <p class="vazio">Nenhum combo cadastrado.</p>
-    {% endfor %}
+    <p class="vazio">
+        {% if busca or categoria_selecionada %}
+        Nenhum combo encontrado com esses filtros.
+        {% else %}
+        Nenhum combo cadastrado.
+        {% endif %}
+    </p> {% endfor %}
 </div>
 {% endblock %}

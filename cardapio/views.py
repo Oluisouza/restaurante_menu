@@ -17,6 +17,17 @@ def filtrar_pratos(request, pratos):
 
     return pratos.filter(filtros), busca, categoria_id
 
+def filtrar_combos(combos, busca, categoria_id):
+    if busca:
+        combos = combos.filter(
+            Q(nome__icontains=busca)
+            | Q(descricao__icontains=busca)
+            | Q(itens__prato__nome__icontains=busca)
+        )
+    if categoria_id.isdigit():
+        combos = combos.filter(itens__prato__categoria_id=categoria_id)
+    return combos.distinct()
+
 def lista_cardapio(request):
     pratos, busca, categoria_id = filtrar_pratos(
         request, Prato.objects.filter(disponivel=True).select_related('categoria')
@@ -32,7 +43,7 @@ def lista_cardapio(request):
     contexto = {
         'secoes': secoes,
         'categorias': categorias,
-        'combos': Combo.objects.filter(disponivel=True).prefetch_related('itens__prato'),
+        'combos': filtrar_combos(Combo.objects.filter(disponivel=True).prefetch_related('itens__prato'), busca, categoria_id),
         'busca': busca,
         'categoria_selecionada': categoria_id,
     }
