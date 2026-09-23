@@ -1,4 +1,5 @@
 from django import forms
+from decimal import Decimal
 
 from .models import Prato
 
@@ -21,3 +22,11 @@ class PratoForm(forms.ModelForm):
         help_texts = {
             'disponivel': 'Desmarque quando o item acabar, sem precisar excluí-lo.',
         }
+
+    def clean_preco(self):
+        preco = self.cleaned_data.get('preco')
+        if preco is not None and preco <= Decimal('0'):
+            raise forms.ValidationError(
+                '⚠︎ O preço deve ser maior que zero. Item de cortesia se registra como desconto no fechamento da comanda.'
+            )
+        return preco
