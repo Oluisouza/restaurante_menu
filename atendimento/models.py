@@ -225,7 +225,12 @@ class ItemComanda(models.Model):
                 condition=models.Q(preco_unitario__isnull=True) |
                 models.Q(preco_unitario__gte=0),
                 name='item_preco_nao_negativo',
-            )
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(status='CANCELADO') | ~models.Q(motivo_cancelamento=''),
+                name='item_cancelado_tem_motivo',
+                violation_error_message='Item cancelado precisa de um motivo.',
+            ),
         ]
 
     def __str__(self):
@@ -257,7 +262,7 @@ class ItemComanda(models.Model):
 
     def cancelar(self, motivo):
         motivo = (motivo or '').strip()
-        if not self.comanda.esta_aberta():
+        if not self.comanda.esta_aberta:
             raise ValidationError('A comanda deste item já foi encerrada.')
         if self.status == self.Status.CANCELADO:
             raise ValidationError('Este item já foi cancelado.')

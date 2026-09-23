@@ -274,7 +274,9 @@ class ResumoTest(TestCase):
         cancelado = ItemComanda.objects.create(
             comanda=comanda, prato=self.espresso, quantidade=7
         )
-        ItemComanda.objects.filter(pk=cancelado.pk).update(status=ItemComanda.Status.CANCELADO)
+        ItemComanda.objects.filter(pk=cancelado.pk).update(
+            status=ItemComanda.Status.CANCELADO, motivo_cancelamento='Teste'
+        )
         linha = self.client.get(self.url).context['mais_vendidos'][0]
         self.assertEqual(linha['prato__nome'], 'Espresso')
         self.assertEqual(linha['unidades'], 5)
@@ -451,3 +453,56 @@ class BlindagemTest(TestCase):
         item_admin = ItemComandaAdmin(ItemComanda, admin.site)
         self.assertFalse(item_admin.has_change_permission(request, item))
         self.assertFalse(item_admin.has_delete_permission(request, item))
+
+class CancelarItemTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+
+    def setUp(self):
+        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        self.item = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso, quantidade=2)
+
+    def test_cancelar_registra_motivo_e_data(self):
+        self.item.cancelar('  Cliente desistiu  ')
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ItemComanda.Status.CANCELADO)
+        self.assertEqual(self.item.motivo_cancelamento, 'Cliente desistiu')
+        self.assertIsNotNone(self.item.cancelado_em)
+
+    def test_item_cancelado_sai_do_total_mas_continua_no_banco(self):
+        ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso, quantidade=1)
+        self.item.cancelar('Cliente desistiu')
+        self.assertEqual(self.comanda.total, Decimal('6.00'))
+        self.assertTrue(ItemComanda.objects.filter(pk=self.item.pk).exists())
+
+    def test_cancelar_exige_motivo(self):
+        for motivo in ['', '   ', None]:
+            with self.subTest(motivo=motivo):
+                with self.assertRaises(ValidationError):
+                    self.item.cancelar(motivo)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ItemComanda.Status.PENDENTE)
+
+    def test_nao_cancela_duas_vezes(self):
+        self.item.cancelar('Primeiro motivo')
+        with self.assertRaises(ValidationError):
+            self.item.cancelar('Segundo motivo')
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.motivo_cancelamento, 'Primeiro motivo')
+
+    def test_nao_cancela_item_de_comanda_encerrada(self):
+        self.comanda.fechar(Comanda.FormaPagamento.PIX)
+        with self.assertRaises(ValidationError):
+            self.item.cancelar('Tarde demais')
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ItemComanda.Status.PENDENTE)
+
+    def test_banco_recusa_cancelado_sem_motivo(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ItemComanda.objects.filter(pk=self.item.pk).update(
+                    status=ItemComanda.Status.CANCELADO
+                )
