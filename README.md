@@ -4,7 +4,7 @@ Sistema de atendimento para restaurantes: abertura de comandas, lançamento de p
 
 **Disciplina:** Laboratório de Programação Full Stack
 **Tema:** 09 — Cardápio Digital
-**Stack:** Django 5.2 · PostgreSQL 17+ · Django Templates (MPA) · CSS Proprio
+**Stack:** Django 5.2 · PostgreSQL 17+ · Django Templates (MPA) · CSS próprio
 
 ---
 
@@ -28,13 +28,17 @@ A `ForeignKey` para `Mesa` é **opcional** e **não tem restrição de unicidade
 
 **Estado derivado não vira campo.** `Mesa.ocupada`, `Comanda.subtotal` e `Comanda.total` são calculados. Dado que pode ser derivado não é armazenado — duas fontes para a mesma informação acabam divergindo.
 
-**Regras de negócio no model.** Validações, `fechar()` e `cancelar()` vivem nos models, não nas views. Assim fechar() e cancelar() valem em qualquer contexto;  as validações de clean() só rodam em formulário.
+**Regras de negócio no model.** `Comanda.fechar()`, `Comanda.cancelar()` e `ItemComanda.cancelar()` vivem nos models e valem em qualquer contexto que use o ORM. As validações de `clean()`, por natureza, só rodam em formulário — por isso as regras que não podem falhar foram levadas para o banco.
 
-**Integridade garantida pelo banco.** Sete `CheckConstraint` e três `UniqueConstraint` cobrem: item é prato *ou* combo, quantidade mínima 1, preços e descontos não negativos, capacidade mínima de mesa, coerência entre tipo de atendimento e mesa, e nomes únicos ignorando maiúsculas em categoria, prato e combo. `on_delete=PROTECT` impede apagar o que está em uso.
+**Integridade garantida pelo banco.** Dez `CheckConstraint` e quatro `UniqueConstraint` cobrem: item é prato *ou* combo, quantidades mínimas, preços e descontos não negativos, capacidade mínima de mesa, coerência entre tipo de atendimento e mesa, item cancelado com motivo obrigatório, prato não repetido dentro de um combo, e nomes únicos ignorando maiúsculas em categoria, prato e combo. `on_delete=PROTECT` impede apagar o que está em uso.
 
-**Máquina de estados explícita.** As transições de status do item são um dicionário na view da cozinha, não uma cadeia de `if`. Não é possível voltar de "entregue" para "pendente" nem cancelar item de comanda fechada.
+**Soft delete no cancelamento de item.** Item cancelado não é apagado: muda de estado, registra motivo e data, e sai do total. A constraint `item_cancelado_tem_motivo` garante que nenhum caminho — nem `update()`, nem shell, nem script — deixe um cancelamento sem justificativa.
+
+**Máquina de estados explícita.** As transições de status do item são um dicionário na view da cozinha, não uma cadeia de `if`. Não é possível voltar de "entregue" para "pendente" nem alterar item de comanda fechada. O Admin não contorna a regra: `status` é somente leitura e comanda encerrada é imutável.
 
 **Preço não é editável no lançamento.** O atendente não altera o valor de um item; o gerente altera o cardápio, e exceções viram desconto registrado no fechamento. É segregação de funções: quem define preço não é quem cobra.
+
+**Entrada do cliente é validada antes do ORM.** Todo id vindo de `POST` ou de querystring passa por uma peneira: valor não numérico vira 404, nunca erro 500. O PDV também recusa lançar como item avulso um prato de categoria de adicionais.
 
 ## Modelo de dados
 
@@ -49,23 +53,20 @@ Mesa ──< Comanda ──< ItemComanda ──< ItemAdicional
 - **cardapio**: `Categoria`, `Prato`, `Combo`, `ComboItem`
 - **atendimento**: `Mesa`, `Comanda`, `ItemComanda`, `ItemAdicional`
 
-Dois apps porque os ciclos de vida são diferentes: o cardápio muda raramente e
-é gerido pelo gerente; o atendimento muda a cada minuto e é operado pelo
-atendente.
+Dois apps porque os ciclos de vida são diferentes: o cardápio muda raramente e é gerido pelo gerente; o atendimento muda a cada minuto e é operado pelo atendente.
 
 ## Funcionalidades
 
-- Abertura de comanda por tipo de atendimento (mesa, viagem, balcão), com o
-  tipo vindo da URL — o atendente não escolhe num select
+- Abertura de comanda por tipo de atendimento (mesa, viagem, balcão), com o tipo vindo da URL — o atendente não escolhe num select
 - Múltiplas comandas simultâneas na mesma mesa
-- **Tela de PDV**: grade de produtos por categoria, clique adiciona ao
-  carrinho, e clicar de novo incrementa a linha existente em vez de duplicar
-- Ajuste de quantidade e remoção direto no carrinho
+- **Tela de PDV**: grade de produtos por categoria, clique adiciona ao carrinho, e clicar de novo incrementa a linha existente em vez de duplicar
+- **Personalização de item na própria tela do PDV**: quantidade, observação e adicionais, sem sair do carrinho
+- Ajuste de quantidade e remoção direto no carrinho, apenas para item ainda pendente
 - Edição de item (produto, quantidade, observação) pela tela da comanda
-- Fechamento com forma de pagamento, taxa de serviço e desconto, com **prévia
-  do total antes de confirmar**
-- Cancelamento com tela de confirmação
+- Fechamento com forma de pagamento, taxa de serviço e desconto, com **prévia do total antes de confirmar**
+- Cancelamento de comanda com tela de confirmação
 - Painel da cozinha com fila FIFO e transições de status validadas
+- **Resumo do dia**: faturamento, ticket médio, descontos concedidos, comandas canceladas, totais por forma de pagamento e itens mais vendidos, com navegação entre dias
 - CRUD dos itens do cardápio pela tela (categorias e combos pelo Admin), com controle de disponibilidade
 - Busca e filtros nas listagens
 
@@ -110,7 +111,9 @@ O `carregar_dados` é idempotente: recria categorias, pratos, combos e mesas de 
 python manage.py test
 ```
 
-Cobre GET das telas principais e as regras de negócio centrais: snapshot de preço, fechamento sem itens, desconto acima do total, arredondamento da taxa, congelamento do `total_pago`, ocupação da mesa, comandas individuais na mesma mesa, exclusão de prato vendido e transições da cozinha.
+São 41 testes. Cobrem o GET das telas principais e as regras de negócio centrais: snapshot de preço, fechamento sem itens, desconto acima do total, arredondamento da taxa, congelamento do `total_pago`, ocupação da mesa, comandas individuais na mesma mesa, exclusão de prato vendido, transições da cozinha, personalização de item com adicionais, resumo do dia, cancelamento de item com motivo, as constraints do banco e as respostas a entradas forjadas.
+
+Cada teste foi validado por mutação: a regra que ele deveria proteger foi quebrada de propósito, e o teste só foi aceito quando falhou.
 
 ## Rotas
 
@@ -124,41 +127,44 @@ Cobre GET das telas principais e as regras de negócio centrais: snapshot de pre
 | `/comandas/<id>/fechar/` | Fechamento de conta |
 | `/comandas/<id>/cancelar/` | Confirmação de cancelamento |
 | `/itens/<id>/editar/` | Editar item |
+| `/itens/<id>/excluir/` | Remover item |
 | `/mesas/<id>/` | Comandas da mesa |
 | `/cozinha/` | Fila de preparo |
+| `/resumo/` | Resumo do dia (`?data=AAAA-MM-DD` para outros dias) |
 | `/cardapio/` | Cardápio |
 | `/cardapio/pratos/` | Gerenciar cardápio |
 | `/admin/` | Django Admin |
 
 ## Limitações conhecidas
 
-Levantadas em revisão de código feita antes da entrega. Estão documentadas como decisão consciente de escopo, não como omissão.
+Levantadas em revisões de código feitas antes da entrega. Estão documentadas como decisão consciente de escopo, não como omissão.
 
 ### Fora do escopo do P1, previstas para o P2
 
-- **Não há autenticação.** Nenhuma tela exige login — apenas o `/admin/`.  Qualquer pessoa com acesso à máquina pode operar o sistema. Autenticação e  papéis (atendente, cozinha, gerente) são requisito do P2.
+- **Não há autenticação.** Nenhuma tela exige login — apenas o `/admin/`. Qualquer pessoa com acesso à máquina pode operar o sistema. Autenticação e papéis (atendente, cozinha, gerente) são requisito do P2.
 - **Sem tempo real.** A tela da cozinha exige recarga manual. O P2 prevê SSE.
 - **Um restaurante por instalação.** Multi-restaurante é requisito do P2.
 - **Sem API REST.** Prevista para o P2, com Django REST Framework.
 
+### Em andamento
+
+- **Cancelamento de item com motivo: modelo pronto, telas pendentes.** `ItemComanda.cancelar(motivo)` registra motivo e data, tira o item do total e é garantido por constraint no banco. As telas ainda usam exclusão física, então na prática o atendente continua conseguindo remover um item já enviado à cozinha sem deixar rastro. A tela de cancelamento é o próximo passo.
+- **Itens cancelados não aparecem na tela da comanda.** Saem do total e da lista; hoje o registro só é visível no Admin.
+
 ### Decisões conscientes
 
-- **O Admin contorna as regras do model.** O `status` da comanda é editável,   então dá para marcá-la como fechada sem passar por `fechar()`, com  `total_pago` e `fechada_em` vazios. As ações "Marcar como…" alteram o status  dos itens com `update()`, ignorando a máquina de estados e o bloqueio de  comanda fechada. No inline, o preço digitado é recapturado se o produto for trocado.
-- **Exclusão física de itens.** Remover um item apaga a linha, sem histórico  de quem removeu ou quando. Auditoria exigiria soft delete e registro de  usuário, o que depende da autenticação acima.
-- **Fechar a comanda tira os itens pendentes da fila da cozinha.** Em balcão e  viagem, onde o cliente costuma pagar antes do preparo, o pedido some da fila ao ser pago. A correção depende de definir a regra de negócio: ou bloquear o fechamento com itens não entregues, ou manter na fila os itens pendentes de comandas já fechadas.
-- **Adicionais existem no modelo, mas não têm tela.** `ItemAdicional` é gerenciável apenas pelo Admin.
-- **Itens já enviados à cozinha podem ser removidos ou editados.** O atendente consegue remover um item em preparo, pronto ou entregue, trocar o produto ou alterar a quantidade pela tela de edição — o "+/−" do PDV só funciona em item pendente, mas a edição não tem essa trava. A cozinha não é avisada. Restringir isso exige papéis (quem pode estornar), o que depende da autenticação.
-- **Itens cancelados não aparecem na tela da comanda.** Saem do total e da lista; o registro só é visível no Admin.
+- **Fechar a comanda tira os itens pendentes da fila da cozinha.** Em balcão e viagem, onde o cliente costuma pagar antes do preparo, o pedido some da fila ao ser pago. A correção depende de definir a regra de negócio: ou bloquear o fechamento com itens não entregues, ou manter na fila os itens pendentes de comandas já fechadas.
+- **O Admin é ferramenta de manutenção, não de operação.** Comanda encerrada é somente leitura, `status` e `total_pago` nunca são editáveis, itens de comanda encerrada não podem ser alterados nem excluídos, e a exclusão em lote foi desativada — porque ela verifica permissão por tipo de objeto, nunca por registro. O que o Admin ainda permite é excluir uma comanda **aberta**, que é operação de limpeza de dados de teste.
 
 ### Limitações técnicas assumidas
 
-- **Sem controle de concorrência.** Incrementos de quantidade usam leitura-e-escrita em Python (`quantidade += 1`) em vez de `F()`, e`fechar()` não usa `transaction.atomic()` nem `select_for_update()`. Dois terminais simultâneos podem perder um incremento ou fechar a mesma comanda duas vezes. Irrelevante com um operador; obrigatório antes de uso real.
+- **Sem controle de concorrência.** Incrementos de quantidade usam leitura-e-escrita em Python (`quantidade += 1`) em vez de `F()`, e `fechar()` não usa `transaction.atomic()` nem `select_for_update()`. Dois terminais simultâneos podem perder um incremento ou fechar a mesma comanda duas vezes. Irrelevante com um operador; obrigatório antes de uso real.
 - **`Comanda.save()` grava `codigo=''` no primeiro INSERT** antes de gerar o código a partir do `pk`. Como `codigo` é `unique`, duas criações simultâneas colidem.
 - **Consultas N+1.** Os totais são propriedades que refazem a consulta a cada acesso, e as listagens não têm paginação nem filtro de data. O custo cresce com itens × comandas. Ferramentas: `prefetch_related`, `annotate` e `Paginator`.
 - **Três FKs sem `related_name`** (`ItemComanda.prato`, `ItemComanda.combo` e `ItemAdicional.prato`), o que obriga o acesso reverso `prato.itemcomanda_set` e `combo.itemcomanda_set`.
 - **Classes CSS de etiqueta reaproveitadas** com nomes semanticamente errados (`FECHADA` para "disponível"). Deveriam ser `.positivo` e `.negativo`.
 - **`ALLOWED_HOSTS` vazio.** Em desenvolvimento o sistema só responde em `localhost`; o acesso por outro aparelho da rede recebe 400.
-- **Entradas forjadas não são validadas.** Um POST montado à mão com id não numérico gera 500, e o PDV aceita lançar um adicional como item avulso.
+- **A mídia só é servida com `DEBUG=True`.** O `STATIC_ROOT` está configurado e o `collectstatic` funciona, mas servir arquivos em produção é papel do servidor web, não do Django.
 
 ## Origem
 
@@ -176,3 +182,4 @@ Este projeto **não reaproveita aquele código** — foi reconstruído em Django
 | `if/elif` escolhendo a estratégia de pagamento | `choices` no model |
 | `print()` como log | `self.stdout.write` nos comandos |
 | Schema SQL aplicado à mão | Migrations versionadas |
+| Regra "sempre em minúsculo" documentada em comentário | `UniqueConstraint` com `Lower()` no banco |
