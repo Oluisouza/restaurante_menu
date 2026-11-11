@@ -179,6 +179,14 @@ class ItemComanda(models.Model):
         ENTREGUE = 'ENTREGUE', 'Entregue'
         CANCELADO = 'CANCELADO', 'Cancelado'
 
+    TRANSICOES = {
+        Status.PENDENTE: [Status.EM_PREPARO, Status.CANCELADO],
+        Status.EM_PREPARO: [Status.PRONTO, Status.CANCELADO],
+        Status.PRONTO: [Status.ENTREGUE],
+        Status.ENTREGUE: [],
+        Status.CANCELADO: [],
+    }
+
     comanda = models.ForeignKey(
         Comanda,
         on_delete=models.CASCADE,
@@ -272,6 +280,17 @@ class ItemComanda(models.Model):
         self.motivo_cancelamento = motivo
         self.cancelado_em = timezone.now()
         self.save(update_fields=['status', 'motivo_cancelamento', 'cancelado_em'])
+
+    def mudar_status(self, novo_status, motivo=''):
+        if not self.comanda.esta_aberta:
+            raise ValidationError('A comanda deste item já foi encerrada.')
+        if novo_status not in self.TRANSICOES[self.status]:
+            raise ValidationError('Essa mudança de status não é permitida.')
+        if novo_status == self.Status.CANCELADO:
+            self.cancelar(motivo)
+            return
+        self.status = novo_status
+        self.save(update_fields=['status'])
 
     @classmethod
     def from_db(cls, db, field_names, values):

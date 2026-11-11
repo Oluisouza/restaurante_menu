@@ -506,3 +506,19 @@ class CancelarItemTest(TestCase):
                 ItemComanda.objects.filter(pk=self.item.pk).update(
                     status=ItemComanda.Status.CANCELADO
                 )
+
+        def test_cozinha_cancela_item_com_motivo(self):
+        resposta = self.client.post(
+            reverse('atendimento:cozinha'), {'item': self.item.pk, 'status': 'CANCELADO'}
+        )
+        self.assertRedirects(resposta, reverse('atendimento:cozinha'))
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ItemComanda.Status.CANCELADO)
+        self.assertEqual(self.item.motivo_cancelamento, 'Cancelado pela cozinha')
+
+    def test_transicoes_valem_fora_da_view(self):
+        with self.assertRaises(ValidationError):
+            self.item.mudar_status(ItemComanda.Status.ENTREGUE)
+        self.item.mudar_status(ItemComanda.Status.EM_PREPARO)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ItemComanda.Status.EM_PREPARO)
