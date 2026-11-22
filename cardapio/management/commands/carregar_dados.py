@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand
 
 from atendimento.models import Mesa
 from cardapio.models import Categoria, Combo, ComboItem, Prato
+from core.models import Restaurante
 
 CATEGORIAS = [
     ('Cafés', 1, False),
@@ -51,14 +52,23 @@ COMBOS = [
 
 
 class Command(BaseCommand):
-    help = 'Carrega o cardápio inicial e as mesas do restaurante.'
+    help = 'Carrega o cardápio inicial e as mesas de um restaurante.'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--restaurante', default='Restaurante padrão',
+            help='Nome do restaurante que recebe os dados (é criado se não existir).',
+        )
 
     def handle(self, *args, **options):
+        restaurante, criado = Restaurante.objects.get_or_create(nome=options['restaurante'])
+        self._relatar('Restaurante', restaurante.nome, criado)
         self.stdout.write('Carregando dados iniciais...\n')
 
         categorias = {}
         for nome, ordem, eh_adicional in CATEGORIAS:
             categoria, criada = Categoria.objects.get_or_create(
+                restaurante=restaurante,
                 nome=nome,
                 defaults={'ordem': ordem, 'eh_adicional': eh_adicional},
             )
@@ -67,6 +77,7 @@ class Command(BaseCommand):
 
         for nome, categoria_nome, preco in PRATOS:
             _, criado = Prato.objects.get_or_create(
+                restaurante=restaurante,
                 nome=nome,
                 defaults={
                     'categoria': categorias[categoria_nome],
@@ -77,6 +88,7 @@ class Command(BaseCommand):
 
         for nome, preco, itens in COMBOS:
             combo, criado = Combo.objects.get_or_create(
+                restaurante=restaurante,
                 nome=nome,
                 defaults={'preco': Decimal(preco)},
             )
@@ -84,13 +96,14 @@ class Command(BaseCommand):
             for prato_nome, quantidade in itens:
                 ComboItem.objects.get_or_create(
                     combo=combo,
-                    prato=Prato.objects.get(nome=prato_nome),
+                    prato=Prato.objects.get(restaurante=restaurante, nome=prato_nome),
                     defaults={'quantidade': quantidade},
                 )
 
         for numero in range(1, 13):
             identificacao = f'{numero:02d}'
             _, criada = Mesa.objects.get_or_create(
+                restaurante=restaurante,
                 identificacao=identificacao,
                 defaults={'capacidade': 4},
             )
@@ -98,6 +111,7 @@ class Command(BaseCommand):
 
         for identificacao, capacidade in [('Varanda 1', 6), ('Varanda 2', 2)]:
             _, criada = Mesa.objects.get_or_create(
+                restaurante=restaurante,
                 identificacao=identificacao,
                 defaults={'capacidade': capacidade},
             )
@@ -105,10 +119,11 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'\nPronto: {Categoria.objects.count()} categorias, '
-                f'{Prato.objects.count()} pratos, '
-                f'{Combo.objects.count()} combos, '
-                f'{Mesa.objects.count()} mesas.'
+                f'\nPronto: {restaurante.nome} tem '
+                f'{Categoria.objects.filter(restaurante=restaurante).count()} categorias, '
+                f'{Prato.objects.filter(restaurante=restaurante).count()} pratos, '
+                f'{Combo.objects.filter(restaurante=restaurante).count()} combos e '
+                f'{Mesa.objects.filter(restaurante=restaurante).count()} mesas.'
             )
         )
 
