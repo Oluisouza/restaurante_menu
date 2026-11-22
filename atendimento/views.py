@@ -79,30 +79,18 @@ def _adicionar_produto(request, comanda):
     combo_id = request.POST.get('combo')
 
     if prato_id:
-        produto = get_object_or_404(
-            Prato, pk=_id_valido(prato_id), categoria__eh_adicional=False
-        )
-        chave = {'prato': produto, 'combo': None}
+        produto = get_object_or_404(Prato.objects.select_related('categoria'), pk=_id_valido(prato_id))
     elif combo_id:
         produto = get_object_or_404(Combo, pk=_id_valido(combo_id))
-        chave = {'prato': None, 'combo': produto}
     else:
         messages.error(request, 'Nenhum produto informado.')
         return
 
-    if not produto.disponivel:
-        messages.error(request, f'{produto.nome} acabou de ficar indisponível.')
+    try:
+        comanda.lancar(produto)
+    except ValidationError as erro:
+        messages.error(request, '; '.join(erro.messages))
         return
-
-    existente = comanda.itens.filter(
-        status=ItemComanda.Status.PENDENTE, observacao='', adicionais__isnull=True, **chave
-    ).first()
-
-    if existente:
-        existente.quantidade += 1
-        existente.save(update_fields=['quantidade'])
-    else:
-        ItemComanda.objects.create(comanda=comanda, quantidade=1, **chave)
 
     messages.success(request, f'{produto.nome} lançado.')
 

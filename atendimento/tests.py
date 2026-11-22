@@ -7,8 +7,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 
-from cardapio.models import Categoria, Prato
-
+from cardapio.models import Categoria, Combo, Prato
 from .admin import ComandaAdmin, ItemComandaAdmin
 from .models import Comanda, ItemComanda, Mesa
 
@@ -407,8 +406,10 @@ class BlindagemTest(TestCase):
                 self.assertEqual(self.client.post(url, dados).status_code, 404)
 
     def test_adicional_nao_e_lancado_como_item(self):
-        resposta = self.client.post(self.pdv, {'acao': 'adicionar', 'prato': self.leite.pk})
-        self.assertEqual(resposta.status_code, 404)
+        resposta = self.client.post(
+            self.pdv, {'acao': 'adicionar', 'prato': self.leite.pk}, follow=True
+        )
+        self.assertContains(resposta, 'é adicional')
         self.assertEqual(self.comanda.itens.count(), 0)
 
     def test_produto_esgotado_mostra_mensagem(self):
@@ -611,3 +612,36 @@ class CancelarItemTelaTest(TestCase):
         self.assertRedirects(resposta, self.detalhe)
         self.item.refresh_from_db()
         self.assertEqual(self.item.motivo_cancelamento, 'Cliente desistiu')
+
+class LancarTest(TestCase):
+    """As regras de lançamento valem para quem chamar o model, com ou sem tela."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        adic = Categoria.objects.create(nome='Adicionais', ordem=9, eh_adicional=True)
+        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        cls.leite = Prato.objects.create(nome='Leite vegetal', preco=Decimal('3.00'), categoria=adic)
+        cls.combo = Combo.objects.create(nome='Combo manhã', preco=Decimal('10.00'), disponivel=False)
+
+    def setUp(self):
+        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+
+    def test_lancar_agrupa_item_pendente_igual(self):
+        self.comanda.lancar(self.espresso)
+        item = self.comanda.lancar(self.espresso)
+        self.assertEqual(self.comanda.itens.count(), 1)
+        self.assertEqual(item.quantidade, 2)
+
+    def test_model_recusa_lancamentos_invalidos(self):
+        tentativas = {
+            'adicional avulso': (Comanda.Status.ABERTA, self.leite),
+            'combo indisponivel': (Comanda.Status.ABERTA, self.combo),
+            'comanda fechada': (Comanda.Status.FECHADA, self.espresso),
+        }
+        for nome, (status, produto) in tentativas.items():
+            with self.subTest(nome):
+                comanda = Comanda.objects.create(tipo=Comanda.Tipo.BALCAO, status=status)
+                with self.assertRaises(ValidationError):
+                    comanda.lancar(produto)
+                self.assertEqual(comanda.itens.count(), 0)

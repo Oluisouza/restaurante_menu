@@ -142,6 +142,33 @@ class Comanda(models.Model):
     def esta_aberta(self):
         return self.status == self.Status.ABERTA
 
+    def lancar(self, produto):
+        if not self.esta_aberta:
+            raise ValidationError('A comanda já foi encerrada.')
+
+        if isinstance(produto, Prato):
+            if produto.categoria.eh_adicional:
+                raise ValidationError(
+                    f'{produto.nome} é adicional: escolha pelo "personalizar" de um item.'
+                )
+            chave = {'prato': produto, 'combo': None}
+        elif isinstance(produto, Combo):
+            chave = {'prato': None, 'combo': produto}
+        else:
+            raise TypeError('Só é possível lançar um prato ou um combo.')
+
+        if not produto.disponivel:
+            raise ValidationError(f'{produto.nome} acabou de ficar indisponível.')
+
+        existente = self.itens.filter(
+            status=ItemComanda.Status.PENDENTE, observacao='', adicionais__isnull=True, **chave
+        ).first()
+        if existente:
+            existente.quantidade += 1
+            existente.save(update_fields=['quantidade'])
+            return existente
+        return ItemComanda.objects.create(comanda=self, quantidade=1, **chave)
+
     def fechar(self, forma_pagamento=None):
         if not self.esta_aberta:
             raise ValidationError('Comanda já está fechada ou cancelada.')
