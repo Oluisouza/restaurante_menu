@@ -18,6 +18,12 @@ def _comanda_do_restaurante(request, pk):
         Comanda.objects.select_related('mesa'), pk=pk, restaurante=restaurante_atual(request)
     )
 
+def _item_do_restaurante(request, pk):
+    return get_object_or_404(
+        ItemComanda.objects.select_related('comanda', 'comanda__mesa'),
+        pk=pk, comanda__restaurante=restaurante_atual(request),
+    )
+
 def salao(request):
     restaurante = restaurante_atual(request)
     mesas = Mesa.objects.filter(restaurante=restaurante, ativa=True)
@@ -240,14 +246,14 @@ def cancelar_comanda(request, pk):
     return render(request, 'atendimento/confirmar_cancelamento.html', {'comanda': comanda})
 
 def editar_item(request, pk):
-    item = get_object_or_404(ItemComanda.objects.select_related('comanda', 'comanda__mesa'), pk=pk)
+    item = _item_do_restaurante(request, pk)
     comanda = item.comanda
 
     try:
         item.exigir_alteravel()
     except ValidationError as erro:
         messages.error(request, '; '.join(erro.messages))
-        return  redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
 
     if request.method == 'POST':
         form = ItemComandaForm(request.POST, instance=item)
@@ -261,7 +267,7 @@ def editar_item(request, pk):
     return render(request, 'atendimento/form_item_edicao.html', {'form': form, 'item': item, 'comanda': comanda},)
 
 def excluir_item(request, pk):
-    item = get_object_or_404(ItemComanda.objects.select_related('comanda'), pk=pk)
+    item = _item_do_restaurante(request, pk)
     comanda = item.comanda
 
     try:
@@ -280,9 +286,7 @@ def excluir_item(request, pk):
 
 def cozinha(request):
     if request.method == 'POST':
-        item = get_object_or_404(
-            ItemComanda.objects.select_related('comanda'), pk=_id_valido(request.POST.get('item'))
-        )
+        item = _item_do_restaurante(request, _id_valido(request.POST.get('item')))
         try:
             item.mudar_status(request.POST.get('status'), motivo='Cancelado pela cozinha')
         except ValidationError as erro:
@@ -295,7 +299,12 @@ def cozinha(request):
         return redirect('atendimento:cozinha')
 
     itens = (
-        ItemComanda.objects.filter(comanda__status=Comanda.Status.ABERTA).exclude(status__in=[ItemComanda.Status.ENTREGUE, ItemComanda.Status.CANCELADO]).select_related('comanda', 'comanda__mesa', 'prato', 'combo').prefetch_related('adicionais__prato').order_by('criado_em')
+        ItemComanda.objects
+        .filter(comanda__restaurante=restaurante_atual(request), comanda__status=Comanda.Status.ABERTA)
+        .exclude(status__in=[ItemComanda.Status.ENTREGUE, ItemComanda.Status.CANCELADO])
+        .select_related('comanda', 'comanda__mesa', 'prato', 'combo')
+        .prefetch_related('adicionais__prato')
+        .order_by('criado_em')
     )
     return render(request, 'atendimento/cozinha.html', {'itens': itens})
 
@@ -309,8 +318,9 @@ def _data_do_resumo(request):
 
 def resumo(request):
     dia = _data_do_resumo(request)
+    comandas = Comanda.objects.filter(restaurante=restaurante_atual(request))
 
-    fechadas = Comanda.objects.filter(
+    fechadas = comandas.filter(
         status=Comanda.Status.FECHADA, fechada_em__date=dia
     )
     totais = fechadas.aggregate(
@@ -347,15 +357,15 @@ def resumo(request):
         'totais': totais,
         'por_pagamento': por_pagamento,
         'mais_vendidos': mais_vendidos,
-        'canceladas': Comanda.objects.filter(
+        'canceladas': comandas.filter(
             status=Comanda.Status.CANCELADA, fechada_em__date=dia
         ).count(),
-        'abertas_agora': Comanda.objects.filter(status=Comanda.Status.ABERTA).count(),
+        'abertas_agora': comandas.filter(status=Comanda.Status.ABERTA).count(),
     }
     return render(request, 'atendimento/resumo.html', contexto)
 
 def cancelar_item(request, pk):
-    item = get_object_or_404(ItemComanda.objects.select_related('comanda'), pk=pk)
+    item = _item_do_restaurante(request, pk)
     comanda = item.comanda
 
     try:

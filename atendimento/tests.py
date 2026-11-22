@@ -765,3 +765,66 @@ class IsolamentoComandasTest(TesteComRestaurante):
         self.client.post(url, {'mesa': self.mesa.pk, 'responsavel': 'Bruno'})
         self.assertEqual(Comanda.objects.get(responsavel='Bruno').restaurante, self.restaurante)
 
+class IsolamentoItensTest(TesteComRestaurante):
+    """Itens, fila da cozinha e resumo do dia enxergam só o próprio restaurante."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés')
+        cls.prato = Prato.objects.create(restaurante=cls.restaurante, nome='Meu café', preco=Decimal('6.00'), categoria=cat)
+
+        cls.outro = Restaurante.objects.create(nome='Restaurante Vizinho')
+        cat_outra = Categoria.objects.create(restaurante=cls.outro, nome='Cafés do vizinho')
+        cls.prato_outro = Prato.objects.create(
+            restaurante=cls.outro, nome='Café do vizinho', preco=Decimal('50.00'), categoria=cat_outra
+        )
+
+    def setUp(self):
+        super().setUp()
+        self.comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        self.item = ItemComanda.objects.create(comanda=self.comanda, prato=self.prato)
+        self.comanda_outra = Comanda.objects.create(restaurante=self.outro, tipo=Comanda.Tipo.VIAGEM, responsavel='Vizinho')
+        self.item_outro = ItemComanda.objects.create(comanda=self.comanda_outra, prato=self.prato_outro)
+
+    def test_cozinha_mostra_so_itens_do_proprio_restaurante(self):
+        resposta = self.client.get(reverse('atendimento:cozinha'))
+        self.assertEqual(list(resposta.context['itens']), [self.item])
+
+    def test_item_de_outro_restaurante_da_404(self):
+        tentativas = {
+            'abrir edicao': lambda pk: self.client.get(reverse('atendimento:editar_item', args=[pk])),
+            'abrir exclusao': lambda pk: self.client.get(reverse('atendimento:excluir_item', args=[pk])),
+            'confirmar exclusao': lambda pk: self.client.post(reverse('atendimento:excluir_item', args=[pk])),
+            'cancelar com motivo': lambda pk: self.client.post(
+                reverse('atendimento:cancelar_item', args=[pk]), {'motivo': 'Invasão'}
+            ),
+            'mudar status na cozinha': lambda pk: self.client.post(
+                reverse('atendimento:cozinha'), {'item': pk, 'status': 'EM_PREPARO'}
+            ),
+        }
+        for nome, tentar in tentativas.items():
+            with self.subTest(nome):
+                alvo = ItemComanda.objects.create(comanda=self.comanda_outra, prato=self.prato_outro)
+                self.assertEqual(tentar(alvo.pk).status_code, 404)
+                alvo = ItemComanda.objects.filter(pk=alvo.pk).first()
+                self.assertIsNotNone(alvo, 'o item do vizinho foi apagado')
+                self.assertEqual(alvo.status, ItemComanda.Status.PENDENTE)
+
+    def test_editar_item_nao_aceita_prato_de_outro_restaurante(self):
+        url = reverse('atendimento:editar_item', args=[self.item.pk])
+        self.assertNotContains(self.client.get(url), 'Café do vizinho')
+
+        resposta = self.client.post(url, {'prato': self.prato_outro.pk, 'quantidade': 1})
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn('prato', resposta.context['form'].errors)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.prato, self.prato)
+
+    def test_resumo_conta_so_o_proprio_restaurante(self):
+        self.comanda.fechar(Comanda.FormaPagamento.PIX)
+        self.comanda_outra.fechar(Comanda.FormaPagamento.PIX)
+        resposta = self.client.get(reverse('atendimento:resumo'))
+        self.assertEqual(resposta.context['totais']['quantidade'], 1)
+        self.assertEqual(resposta.context['totais']['faturamento'], Decimal('6.00'))
+        self.assertEqual([l['prato__nome'] for l in resposta.context['mais_vendidos']], ['Meu café'])
