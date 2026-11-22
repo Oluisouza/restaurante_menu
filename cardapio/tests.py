@@ -1,5 +1,5 @@
 from decimal import Decimal
-
+from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.urls import reverse
 
@@ -242,3 +242,56 @@ class IsolamentoCardapioTest(TesteComRestaurante):
         self.assertEqual(resposta.status_code, 200)
         self.assertIn('categoria', resposta.context['form'].errors)
         self.assertFalse(Prato.objects.filter(nome='Intruso').exists())
+
+class IsolamentoApiTest(TesteComRestaurante):
+    """A API segue o mesmo isolamento das telas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.categoria = Categoria.objects.create(restaurante=cls.restaurante, nome='Bebidas')
+        Prato.objects.create(restaurante=cls.restaurante, nome='Meu prato', preco=Decimal('5.00'), categoria=cls.categoria)
+
+        cls.outro = Restaurante.objects.create(nome='Restaurante Vizinho')
+        cls.categoria_outra = Categoria.objects.create(restaurante=cls.outro, nome='Bebidas do vizinho')
+        cls.prato_outro = Prato.objects.create(
+            restaurante=cls.outro, nome='Prato do vizinho', preco=Decimal('9.00'), categoria=cls.categoria_outra
+        )
+
+    def setUp(self):
+        super().setUp()
+        self.lista = reverse('cardapio_api:lista_pratos')
+
+    def test_lista_so_o_proprio_restaurante(self):
+        nomes = [p['nome'] for p in self.client.get(self.lista).json()]
+        self.assertEqual(nomes, ['Meu prato'])
+
+    def test_prato_de_outro_restaurante_da_404(self):
+        url = reverse('cardapio_api:detalhe_prato', args=[self.prato_outro.pk])
+        tentativas = {
+            'ler': lambda: self.client.get(url),
+            'alterar': lambda: self.client.patch(url, {'nome': 'Invadido'}, content_type='application/json'),
+            'apagar': lambda: self.client.delete(url),
+        }
+        for nome, tentar in tentativas.items():
+            with self.subTest(nome):
+                self.assertEqual(tentar().status_code, 404)
+        self.prato_outro.refresh_from_db()
+        self.assertEqual(self.prato_outro.nome, 'Prato do vizinho')
+
+    def test_criacao_nasce_no_restaurante_e_recusa_categoria_alheia(self):
+        recusado = self.client.post(self.lista, {
+            'nome': 'Intruso', 'preco': '5.00', 'categoria': self.categoria_outra.pk,
+        }, content_type='application/json')
+        self.assertEqual(recusado.status_code, 400)
+        self.assertIn('categoria', recusado.json())
+
+        criado = self.client.post(self.lista, {
+            'nome': 'Suco', 'preco': '7.00', 'categoria': self.categoria.pk,
+        }, content_type='application/json')
+        self.assertEqual(criado.status_code, 201)
+        self.assertEqual(Prato.objects.get(pk=criado.json()['id']).restaurante, self.restaurante)
+
+    def test_usuario_sem_perfil_recebe_403(self):
+        self.client.force_login(User.objects.create_user('sem_perfil', password='x'))
+        self.assertEqual(self.client.get(self.lista).status_code, 403)

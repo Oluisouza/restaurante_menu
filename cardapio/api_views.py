@@ -2,18 +2,26 @@ from django.db.models import ProtectedError
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 
+from core.utils import restaurante_atual
+
 from .models import Prato
 from .serializers import PratoSerializer
 
 
-class PratoListCreate(generics.ListCreateAPIView):
-    queryset = Prato.objects.all()
+class PratosDoRestaurante:
+    """A API só enxerga os pratos do restaurante de quem pede."""
+
     serializer_class = PratoSerializer
 
+    def get_queryset(self):
+        return Prato.objects.filter(restaurante=restaurante_atual(self.request))
 
-class PratoDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Prato.objects.all()
-    serializer_class = PratoSerializer
+
+class PratoListCreate(PratosDoRestaurante, generics.ListCreateAPIView):
+    pass
+
+
+class PratoDetail(PratosDoRestaurante, generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         try:
