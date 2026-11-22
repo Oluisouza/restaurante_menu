@@ -16,7 +16,7 @@ class Restaurante(models.Model):
 class DoRestaurante(models.Model):
     """Base abstrata: todo dado de negócio pertence a um restaurante."""
 
-    restaurante = models.ForeignKey(Restaurante, on_delete=models.PROTECT)
+    restaurante = models.ForeignKey(Restaurante, on_delete=models.PROTECT, null=True)
 
     class Meta:
         abstract = True

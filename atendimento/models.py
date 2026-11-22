@@ -6,8 +6,9 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator
 
 from cardapio.models import Prato, Combo
+from core.models import DoRestaurante
 
-class Mesa(models.Model):
+class Mesa(DoRestaurante):
     identificacao = models.CharField(max_length=20, unique=True)
     capacidade = models.PositiveIntegerField(default=4)
     ativa = models.BooleanField(default=True)
@@ -36,7 +37,7 @@ class Mesa(models.Model):
         return self.comandas_abertas.exists()
 
 
-class Comanda(models.Model):
+class Comanda(DoRestaurante):
 
     class Tipo(models.TextChoices):
         MESA = 'MESA', 'Mesa'

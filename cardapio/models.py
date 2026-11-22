@@ -2,7 +2,9 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.core.validators import MinValueValidator
 
-class Categoria(models.Model):
+from core.models import DoRestaurante
+
+class Categoria(DoRestaurante):
     nome = models.CharField(max_length=100, unique=True)
     ordem = models.PositiveIntegerField(default=0)
     eh_adicional = models.BooleanField(default=False)
@@ -26,7 +28,7 @@ class Categoria(models.Model):
     def __str__(self):
         return self.nome
 
-class Prato(models.Model):
+class Prato(DoRestaurante):
     nome = models.CharField(max_length=100)
     descricao = models.TextField(blank=True)
     preco = models.DecimalField(max_digits=10, decimal_places=2)
@@ -66,7 +68,7 @@ class Prato(models.Model):
     def __str__(self):
         return f'{self.nome} - R$ {self.preco}'
 
-class Combo(models.Model):
+class Combo(DoRestaurante):
     nome = models.CharField(max_length=100)
     descricao = models.TextField(blank=True)
     preco = models.DecimalField(max_digits=10, decimal_places=2)
