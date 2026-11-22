@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 
 from cardapio.models import Categoria, Combo, Prato
+from core.models import Restaurante
 from core.para_testes import TesteComRestaurante
 
 from .admin import ComandaAdmin, ItemComandaAdmin
@@ -682,3 +683,85 @@ class LancarTest(TesteComRestaurante):
                 with self.assertRaises(ValidationError):
                     comanda.lancar(produto)
                 self.assertEqual(comanda.itens.count(), 0)
+
+class IsolamentoComandasTest(TesteComRestaurante):
+    """Comandas, mesas e o PDV de um restaurante não vazam para o outro."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés')
+        cls.prato = Prato.objects.create(restaurante=cls.restaurante, nome='Meu café', preco=Decimal('6.00'), categoria=cat)
+        cls.mesa = Mesa.objects.create(restaurante=cls.restaurante, identificacao='Mesa da casa', capacidade=4)
+
+        cls.outro = Restaurante.objects.create(nome='Restaurante Vizinho')
+        cat_outra = Categoria.objects.create(restaurante=cls.outro, nome='Cafés do vizinho')
+        cls.prato_outro = Prato.objects.create(
+            restaurante=cls.outro, nome='Café do vizinho', preco=Decimal('7.00'), categoria=cat_outra
+        )
+        cls.combo_outro = Combo.objects.create(restaurante=cls.outro, nome='Combo do vizinho', preco=Decimal('12.00'))
+        cls.mesa_outra = Mesa.objects.create(restaurante=cls.outro, identificacao='Mesa do vizinho', capacidade=2)
+
+    def setUp(self):
+        super().setUp()
+        self.comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        self.comanda_outra = Comanda.objects.create(
+            restaurante=self.outro, tipo=Comanda.Tipo.MESA, mesa=self.mesa_outra, responsavel='Cliente do vizinho'
+        )
+
+    def test_salao_e_lista_mostram_so_o_proprio_restaurante(self):
+        salao = self.client.get(reverse('atendimento:salao'))
+        self.assertContains(salao, 'Mesa da casa')
+        self.assertNotContains(salao, 'Mesa do vizinho')
+        self.assertEqual(salao.context['total_abertas'], 1)
+
+        lista = self.client.get(reverse('atendimento:lista_comandas'))
+        self.assertEqual([c.codigo for c in lista.context['comandas']], [self.comanda.codigo])
+
+    def test_comanda_e_mesa_de_outro_restaurante_dao_404(self):
+        pk = self.comanda_outra.pk
+        urls = [reverse(nome, args=[pk]) for nome in (
+            'atendimento:detalhe_comanda',
+            'atendimento:lancar_item',
+            'atendimento:fechar_comanda',
+            'atendimento:cancelar_comanda',
+        )] + [reverse('atendimento:detalhe_mesa', args=[self.mesa_outra.pk])]
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+
+        cancelar = reverse('atendimento:cancelar_comanda', args=[pk])
+        self.assertEqual(self.client.post(cancelar).status_code, 404)
+        self.comanda_outra.refresh_from_db()
+        self.assertEqual(self.comanda_outra.status, Comanda.Status.ABERTA)
+
+    def test_pdv_nao_mostra_nem_lanca_produto_de_outro_restaurante(self):
+        pdv = reverse('atendimento:lancar_item', args=[self.comanda.pk])
+        tela = self.client.get(pdv)
+        self.assertContains(tela, 'Meu café')
+        self.assertNotContains(tela, 'Café do vizinho')
+        self.assertNotContains(tela, 'Combo do vizinho')
+
+        for dados in ({'prato': self.prato_outro.pk}, {'combo': self.combo_outro.pk}):
+            with self.subTest(dados=dados):
+                resposta = self.client.post(pdv, {'acao': 'adicionar', **dados})
+                self.assertEqual(resposta.status_code, 404)
+        self.assertEqual(self.comanda.itens.count(), 0)
+
+    def test_model_recusa_produto_de_outro_restaurante(self):
+        for produto in (self.prato_outro, self.combo_outro):
+            with self.subTest(produto=produto.nome):
+                with self.assertRaises(ValidationError):
+                    self.comanda.lancar(produto)
+        self.assertEqual(self.comanda.itens.count(), 0)
+
+    def test_comanda_nova_nasce_no_restaurante_e_so_aceita_mesa_dele(self):
+        url = reverse('atendimento:nova_comanda', args=['mesa'])
+        recusada = self.client.post(url, {'mesa': self.mesa_outra.pk, 'responsavel': 'Intruso'})
+        self.assertEqual(recusada.status_code, 200)
+        self.assertIn('mesa', recusada.context['form'].errors)
+        self.assertFalse(Comanda.objects.filter(responsavel='Intruso').exists())
+
+        self.client.post(url, {'mesa': self.mesa.pk, 'responsavel': 'Bruno'})
+        self.assertEqual(Comanda.objects.get(responsavel='Bruno').restaurante, self.restaurante)
+

@@ -22,10 +22,11 @@ class ComandaForm(forms.ModelForm):
             'responsavel': forms.TextInput(attrs={'placeholder': 'Ex.: João, ou camisa azul', 'autofocus': True}),
         }
 
-    def __init__(self, *args, tipo=None, **kwargs):
+    def __init__(self, *args, tipo=None, restaurante, **kwargs):
         super().__init__(*args, **kwargs)
+        self.instance.restaurante = restaurante
         if tipo == Comanda.Tipo.MESA:
-            self.fields['mesa'].queryset = Mesa.objects.filter(ativa=True)
+            self.fields['mesa'].queryset = Mesa.objects.filter(restaurante=restaurante, ativa=True)
             self.fields['mesa'].required = True
             self.fields['mesa'].empty_label = '- Escolha a mesa -'
         else:
@@ -92,7 +93,9 @@ class PersonalizarItemForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['adicionais_escolhidos'].queryset = Prato.objects.filter(
-            disponivel=True, categoria__eh_adicional=True
+            restaurante=self.instance.comanda.restaurante,
+            disponivel=True,
+            categoria__eh_adicional=True,
         )
         if self.instance.pk:
             self.initial['adicionais_escolhidos'] = list(

@@ -7,29 +7,37 @@ from django.utils import timezone
 
 from datetime import date, timedelta
 
+from core.utils import restaurante_atual
+
 from .forms import CancelarItemForm, ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm
 from .models import Comanda, Mesa, ItemComanda
 from cardapio.models import Categoria, Combo, Prato
 
+def _comanda_do_restaurante(request, pk):
+    return get_object_or_404(
+        Comanda.objects.select_related('mesa'), pk=pk, restaurante=restaurante_atual(request)
+    )
+
 def salao(request):
-    mesas = Mesa.objects.filter(ativa=True)
-    avulsas = Comanda.objects.filter(status=Comanda.Status.ABERTA, mesa__isnull=True,)
-    contexto = {'mesas': mesas, 'avulsas': avulsas, 'total_abertas': Comanda.objects.filter(status=Comanda.Status.ABERTA).count(),}
+    restaurante = restaurante_atual(request)
+    mesas = Mesa.objects.filter(restaurante=restaurante, ativa=True)
+    abertas = Comanda.objects.filter(restaurante=restaurante, status=Comanda.Status.ABERTA)
+    contexto = {'mesas': mesas, 'avulsas': abertas.filter(mesa__isnull=True), 'total_abertas': abertas.count(),}
     return render(request, 'atendimento/salao.html', contexto)
 
 def detalhe_comanda(request, pk):
-    comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
+    comanda = _comanda_do_restaurante(request, pk)
     contexto = { 'comanda': comanda, 'itens': comanda.itens.select_related('prato', 'combo'),}
     return render(request, 'atendimento/detalhe_comanda.html', contexto)
 
 def detalhe_mesa(request, pk):
-    mesa = get_object_or_404(Mesa, pk=pk)
+    mesa = get_object_or_404(Mesa, pk=pk, restaurante=restaurante_atual(request))
     contexto = { 'mesa': mesa, 'comandas': mesa.comandas.select_related('mesa').order_by('-aberta_em'),}
     return render(request, 'atendimento/detalhe_mesa.html', contexto)
 
 def lista_comandas(request):
     status = request.GET.get('status', '')
-    comandas = Comanda.objects.select_related('mesa')
+    comandas = Comanda.objects.filter(restaurante=restaurante_atual(request)).select_related('mesa')
     if status:
         comandas = comandas.filter(status=status)
     contexto = {'comandas': comandas, 'status_selecionado': status, 'status_opcoes': Comanda.Status.choices,}
@@ -45,9 +53,10 @@ def nova_comanda(request, tipo):
     tipo_valor = TIPOS_POR_URL.get(tipo)
     if tipo_valor is None:
         raise Http404('Tipo de atendimento inválido.')
-    
+    restaurante = restaurante_atual(request)
+
     if request.method == 'POST':
-        form = ComandaForm(request.POST, instance=Comanda(tipo=tipo_valor), tipo=tipo_valor)
+        form = ComandaForm(request.POST, instance=Comanda(tipo=tipo_valor), tipo=tipo_valor, restaurante=restaurante)
         if form.is_valid():
             comanda = form.save()
             messages.success(request, f'Comanda {comanda.codigo} aberta.')
@@ -57,7 +66,7 @@ def nova_comanda(request, tipo):
         mesa_id = request.GET.get('mesa')
         if mesa_id and tipo_valor == Comanda.Tipo.MESA:
             inicial['mesa'] = mesa_id
-        form = ComandaForm(initial=inicial, instance=Comanda(tipo=tipo_valor), tipo=tipo_valor)
+        form = ComandaForm(initial=inicial, instance=Comanda(tipo=tipo_valor), tipo=tipo_valor, restaurante=restaurante)
 
     contexto = {
         'form': form,
@@ -79,9 +88,11 @@ def _adicionar_produto(request, comanda):
     combo_id = request.POST.get('combo')
 
     if prato_id:
-        produto = get_object_or_404(Prato.objects.select_related('categoria'), pk=_id_valido(prato_id))
+        produto = get_object_or_404(
+            Prato.objects.select_related('categoria'), pk=_id_valido(prato_id), restaurante=comanda.restaurante
+        )
     elif combo_id:
-        produto = get_object_or_404(Combo, pk=_id_valido(combo_id))
+        produto = get_object_or_404(Combo, pk=_id_valido(combo_id), restaurante=comanda.restaurante)
     else:
         messages.error(request, 'Nenhum produto informado.')
         return
@@ -104,7 +115,7 @@ def _ajustar_item(request, comanda, acao):
         item.exigir_alteravel()
     except ValidationError as erro:
         messages.error(request, '; '.join(erro.messages))
-        return                    # nas helpers do PDV
+        return
 
     if acao == 'incrementar':
         item.quantidade += 1
@@ -113,14 +124,13 @@ def _ajustar_item(request, comanda, acao):
         item.quantidade -= 1
         item.save(update_fields=['quantidade'])
     else:
-        item.delete()
+        item.remover()
         messages.success(request, f'{descricao} removido.')
 
 def _personalizar_item(request, comanda):
     item = get_object_or_404(
         ItemComanda, pk=_id_valido(request.POST.get('item')), comanda=comanda
     )
-    
     try:
         item.exigir_alteravel()
     except ValidationError as erro:
@@ -137,7 +147,7 @@ def _personalizar_item(request, comanda):
 
 
 def lancar_item(request, pk):
-    comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
+    comanda = _comanda_do_restaurante(request, pk)
 
     if not comanda.esta_aberta:
         messages.error(request, f'A comanda {comanda.codigo} já foi encerrada.')
@@ -156,7 +166,7 @@ def lancar_item(request, pk):
         return redirect('atendimento:lancar_item', pk=comanda.pk)
 
     categorias = (
-        Categoria.objects.filter(eh_adicional=False)
+        Categoria.objects.filter(restaurante=comanda.restaurante, eh_adicional=False)
         .prefetch_related(Prefetch('pratos', queryset=Prato.objects.filter(disponivel=True)))
     )
 
@@ -173,7 +183,7 @@ def lancar_item(request, pk):
     contexto = {
         'comanda': comanda,
         'categorias': categorias,
-        'combos': Combo.objects.filter(disponivel=True).prefetch_related('itens__prato'),
+        'combos': Combo.objects.filter(restaurante=comanda.restaurante, disponivel=True).prefetch_related('itens__prato'),
         'itens': comanda.itens_validos.select_related('prato', 'combo').prefetch_related('adicionais__prato'),
         'item_personalizando': item_personalizando,
         'form_personalizar': form_personalizar,
@@ -181,7 +191,7 @@ def lancar_item(request, pk):
     return render(request, 'atendimento/pdv.html', contexto)
 
 def fechar_comanda(request, pk):
-    comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
+    comanda = _comanda_do_restaurante(request, pk)
 
     if not comanda.esta_aberta:
         messages.warning(request, f'A comanda {comanda.codigo} já foi encerrada.')
@@ -212,7 +222,7 @@ def fechar_comanda(request, pk):
     return render(request, 'atendimento/fechar_comanda.html', contexto)
 
 def cancelar_comanda(request, pk):
-    comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
+    comanda = _comanda_do_restaurante(request, pk)
 
     if not comanda.esta_aberta:
         messages.warning(request, f'A comanda {comanda.codigo} já foi encerrada.')

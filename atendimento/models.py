@@ -158,6 +158,9 @@ class Comanda(DoRestaurante):
         else:
             raise TypeError('Só é possível lançar um prato ou um combo.')
 
+        if produto.restaurante_id != self.restaurante_id:
+            raise ValidationError(f'{produto.nome} não pertence a este restaurante.')
+
         if not produto.disponivel:
             raise ValidationError(f'{produto.nome} acabou de ficar indisponível.')
 
