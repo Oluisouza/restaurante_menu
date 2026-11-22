@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.db import IntegrityError, transaction
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
@@ -123,3 +124,59 @@ class ValidacaoPrecoTest(TestCase):
                 with self.assertRaises(IntegrityError):
                     with transaction.atomic():
                         criar()
+
+class PratoApiTest(TestCase):
+    """A API herda as regras do model: mesma validação, resposta em JSON."""
+
+    def setUp(self):
+        self.categoria = Categoria.objects.create(nome='Bebidas')
+        self.usuario = User.objects.create_user('ana', password='senha-teste')
+        self.client.force_login(self.usuario)
+        self.lista = reverse('cardapio_api:lista_pratos')
+
+    def criar(self, **dados):
+        base = {'nome': 'Café', 'preco': '6.00', 'categoria': self.categoria.pk}
+        return self.client.post(self.lista, {**base, **dados}, content_type='application/json')
+
+    def test_sem_login_e_recusado(self):
+        self.client.logout()
+        self.assertEqual(self.client.get(self.lista).status_code, 403)
+        self.assertEqual(self.criar().status_code, 403)
+
+    def test_cria_e_lista_em_json(self):
+        resposta = self.criar()
+        self.assertEqual(resposta.status_code, 201)
+        self.assertEqual(resposta.json()['nome'], 'Café')
+        nomes = [p['nome'] for p in self.client.get(self.lista).json()]
+        self.assertEqual(nomes, ['Café'])
+
+    def test_regras_do_model_viram_400(self):
+        Prato.objects.create(nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
+        casos = {
+            'preco zero': ({'preco': '0'}, 'maior que zero'),
+            'nome repetido ignorando maiusculas': ({'nome': 'CHÁ'}, 'Já existe'),
+        }
+        for nome, (dados, mensagem) in casos.items():
+            with self.subTest(nome):
+                resposta = self.criar(**dados)
+                self.assertEqual(resposta.status_code, 400)
+                self.assertIn(mensagem, str(resposta.json()))
+        self.assertEqual(Prato.objects.count(), 1)
+
+    def test_patch_tambem_passa_pelas_regras(self):
+        prato = Prato.objects.create(nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
+        url = reverse('cardapio_api:detalhe_prato', args=[prato.pk])
+        ok = self.client.patch(url, {'preco': '5.50'}, content_type='application/json')
+        self.assertEqual(ok.status_code, 200)
+        recusado = self.client.patch(url, {'preco': '0'}, content_type='application/json')
+        self.assertEqual(recusado.status_code, 400)
+        prato.refresh_from_db()
+        self.assertEqual(prato.preco, Decimal('5.50'))
+
+    def test_excluir_prato_usado_em_combo_volta_400(self):
+        prato = Prato.objects.create(nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
+        combo = Combo.objects.create(nome='Combo tarde', preco=Decimal('9.00'))
+        ComboItem.objects.create(combo=combo, prato=prato, quantidade=1)
+        resposta = self.client.delete(reverse('cardapio_api:detalhe_prato', args=[prato.pk]))
+        self.assertEqual(resposta.status_code, 400)
+        self.assertTrue(Prato.objects.filter(pk=prato.pk).exists())

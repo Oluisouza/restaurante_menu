@@ -7,6 +7,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('atendimento.urls')),
     path('cardapio/', include('cardapio.urls')),
+    path('api/', include('cardapio.api_urls')),
+    path('api-auth/', include('rest_framework.urls')),
 ]
 
 if settings.DEBUG:
