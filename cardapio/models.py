@@ -5,7 +5,7 @@ from django.core.validators import MinValueValidator
 from core.models import DoRestaurante
 
 class Categoria(DoRestaurante):
-    nome = models.CharField(max_length=100, unique=True)
+    nome = models.CharField(max_length=100)    
     ordem = models.PositiveIntegerField(default=0)
     eh_adicional = models.BooleanField(default=False)
 
@@ -15,9 +15,9 @@ class Categoria(DoRestaurante):
         ordering = ['ordem', 'nome']
         constraints = [
             models.UniqueConstraint(
-                Lower('nome'),
-                name='categoria_nome_unico_ci',
-                violation_error_message='Já existe uma categoria com esse nome.',
+                Lower('nome'), 'restaurante',
+                name='categoria_nome_unico_no_restaurante',
+                violation_error_message='Já existe uma categoria com esse nome neste restaurante.',
             )
         ]
 
@@ -47,9 +47,9 @@ class Prato(DoRestaurante):
         ordering = ['categoria__ordem', 'nome']
         constraints = [
             models.UniqueConstraint(
-                Lower('nome'),
-                name='prato_nome_unico_ci',
-                violation_error_message='Já existe um item do cardápio com esse nome.',
+                Lower('nome'), 'restaurante',
+                name='prato_nome_unico_no_restaurante',
+                violation_error_message='Já existe um item do cardápio com esse nome neste restaurante.',
             ),
             models.CheckConstraint(
                 condition=models.Q(preco__gt=0),
@@ -81,9 +81,9 @@ class Combo(DoRestaurante):
         ordering = ['nome']
         constraints = [
             models.UniqueConstraint(
-                Lower('nome'),
-                name='combo_nome_unico_ci',
-                violation_error_message='Já existe um combo com esse nome.',
+                Lower('nome'), 'restaurante',
+                name='combo_nome_unico_no_restaurante',
+                violation_error_message='Já existe um combo com esse nome neste restaurante.',
             ),
             models.CheckConstraint(
                 condition=models.Q(preco__gt=0),

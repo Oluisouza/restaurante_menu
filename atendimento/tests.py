@@ -241,6 +241,13 @@ class ConstraintsTest(TesteComRestaurante):
             identificacao='99', capacidade=0
         ))
 
+    def test_identificacao_da_mesa_unica_por_restaurante(self):
+        outro = Restaurante.objects.create(nome='Restaurante Vizinho')
+        Mesa.objects.create(restaurante=outro, identificacao='01', capacidade=4)
+        self._deve_bloquear(lambda: Mesa.objects.create(
+            restaurante=self.restaurante, identificacao='01', capacidade=2
+        ))
+
     def test_estados_legitimos_continuam_passando(self):
         Prato.objects.create(restaurante=self.restaurante, nome='Bala', preco=Decimal('0.01'), categoria=self.categoria)
         Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')

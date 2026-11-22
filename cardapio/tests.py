@@ -1,5 +1,8 @@
 from decimal import Decimal
+from io import StringIO
+
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.urls import reverse
 
@@ -295,3 +298,50 @@ class IsolamentoApiTest(TesteComRestaurante):
     def test_usuario_sem_perfil_recebe_403(self):
         self.client.force_login(User.objects.create_user('sem_perfil', password='x'))
         self.assertEqual(self.client.get(self.lista).status_code, 403)
+
+class UnicidadePorRestauranteTest(TesteComRestaurante):
+    """Nomes se repetem entre restaurantes, nunca dentro do mesmo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.outro = Restaurante.objects.create(nome='Restaurante Vizinho')
+        cls.categoria = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés')
+        Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cls.categoria)
+        Combo.objects.create(restaurante=cls.restaurante, nome='Combo manhã', preco=Decimal('10.00'))
+
+    def test_mesmo_nome_em_restaurantes_diferentes_e_permitido(self):
+        categoria = Categoria.objects.create(restaurante=self.outro, nome='Cafés')
+        Prato.objects.create(restaurante=self.outro, nome='Espresso', preco=Decimal('7.00'), categoria=categoria)
+        Combo.objects.create(restaurante=self.outro, nome='Combo manhã', preco=Decimal('11.00'))
+        self.assertEqual(Prato.objects.filter(nome='Espresso').count(), 2)
+
+    def test_banco_recusa_nome_repetido_no_mesmo_restaurante(self):
+        tentativas = {
+            'categoria': lambda: Categoria.objects.create(restaurante=self.restaurante, nome='CAFÉS'),
+            'prato': lambda: Prato.objects.create(
+                restaurante=self.restaurante, nome='espresso', preco=Decimal('6.00'), categoria=self.categoria
+            ),
+            'combo': lambda: Combo.objects.create(restaurante=self.restaurante, nome='COMBO MANHÃ', preco=Decimal('10.00')),
+        }
+        for nome, criar in tentativas.items():
+            with self.subTest(nome):
+                with self.assertRaises(IntegrityError):
+                    with transaction.atomic():
+                        criar()
+
+    def test_tela_recusa_nome_repetido_com_mensagem(self):
+        resposta = self.client.post(reverse('cardapio:novo_prato'), {
+            'nome': 'ESPRESSO', 'preco': '6.00', 'categoria': self.categoria.pk, 'disponivel': True,
+        })
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'Já existe um item do cardápio com esse nome neste restaurante.')
+        self.assertEqual(Prato.objects.filter(restaurante=self.restaurante).count(), 1)
+
+    def test_carregar_dados_monta_dois_restaurantes_com_o_mesmo_cardapio(self):
+        for nome in ('Café do Centro', 'Café da Praia'):
+            call_command('carregar_dados', restaurante=nome, stdout=StringIO())
+        for nome in ('Café do Centro', 'Café da Praia'):
+            with self.subTest(nome):
+                restaurante = Restaurante.objects.get(nome=nome)
+                self.assertEqual(Prato.objects.filter(restaurante=restaurante).count(), 22)

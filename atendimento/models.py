@@ -9,7 +9,7 @@ from cardapio.models import Prato, Combo
 from core.models import DoRestaurante
 
 class Mesa(DoRestaurante):
-    identificacao = models.CharField(max_length=20, unique=True)
+    identificacao = models.CharField(max_length=20)
     capacidade = models.PositiveIntegerField(default=4)
     ativa = models.BooleanField(default=True)
 
@@ -18,13 +18,18 @@ class Mesa(DoRestaurante):
         verbose_name_plural = "mesas"
         ordering = ['identificacao']
         constraints = [
+            models.UniqueConstraint(
+                fields=['restaurante', 'identificacao'],
+                name='mesa_identificacao_unica_no_restaurante',
+                violation_error_message='Já existe uma mesa com essa identificação neste restaurante.',
+            ),
             models.CheckConstraint(
                 condition=models.Q(capacidade__gte=1),
                 name='mesa_capacidade_minima',
                 violation_error_message='A mesa precisa ter ao menos um lugar.',
             ),
         ]
-
+        
     def __str__(self):
         return f'Mesa {self.identificacao}'
 
