@@ -1,28 +1,33 @@
 from decimal import Decimal
 
 from django.contrib import admin
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 
 from cardapio.models import Categoria, Combo, Prato
+from core.para_testes import TesteComRestaurante
+
 from .admin import ComandaAdmin, ItemComandaAdmin
 from .models import Comanda, ItemComanda, Mesa
 
 
-class RotasTest(TestCase):
+class RotasTest(TesteComRestaurante):
     """Garante que toda tela responde 200 e que os links montam."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.categoria = Categoria.objects.create(nome='Cafés', ordem=1)
+        super().setUpTestData()
+        cls.categoria = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
         cls.prato = Prato.objects.create(
+            restaurante=cls.restaurante,
             nome='Espresso', preco=Decimal('6.00'), categoria=cls.categoria
         )
-        cls.mesa = Mesa.objects.create(identificacao='01', capacidade=4)
+        cls.mesa = Mesa.objects.create(restaurante=cls.restaurante, identificacao='01', capacidade=4)
         cls.comanda = Comanda.objects.create(
+            restaurante=cls.restaurante,
             tipo=Comanda.Tipo.MESA, mesa=cls.mesa, responsavel='Teste'
         )
         ItemComanda.objects.create(
@@ -69,22 +74,25 @@ class RotasTest(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
 
 
-class RegrasTest(TestCase):
+class RegrasTest(TesteComRestaurante):
 
     @classmethod
     def setUpTestData(cls):
-        cls.categoria = Categoria.objects.create(nome='Cafés', ordem=1)
+        super().setUpTestData()
+        cls.categoria = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
         cls.prato = Prato.objects.create(
+            restaurante=cls.restaurante,
             nome='Espresso', preco=Decimal('6.00'), categoria=cls.categoria
         )
 
     def _comanda_com_item(self, preco='12.25', quantidade=1):
         prato = Prato.objects.create(
+            restaurante=self.restaurante,
             nome=f'Item {preco}-{quantidade}',
             preco=Decimal(preco),
             categoria=self.categoria,
         )
-        comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='X')
+        comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='X')
         ItemComanda.objects.create(comanda=comanda, prato=prato, quantidade=quantidade)
         return comanda
 
@@ -100,7 +108,7 @@ class RegrasTest(TestCase):
         self.assertEqual(comanda.subtotal, Decimal('12.00'))
 
     def test_nao_fecha_sem_itens(self):
-        comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='X')
+        comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='X')
         with self.assertRaises(ValidationError):
             comanda.fechar(Comanda.FormaPagamento.PIX)
 
@@ -130,8 +138,9 @@ class RegrasTest(TestCase):
         self.assertEqual(comanda.total_pago, Decimal('10.00'))
 
     def test_mesa_ocupada_enquanto_houver_comanda(self):
-        mesa = Mesa.objects.create(identificacao='99', capacidade=2)
+        mesa = Mesa.objects.create(restaurante=self.restaurante, identificacao='99', capacidade=2)
         comanda = Comanda.objects.create(
+            restaurante=self.restaurante,
             tipo=Comanda.Tipo.MESA, mesa=mesa, responsavel='A'
         )
         ItemComanda.objects.create(comanda=comanda, prato=self.prato, quantidade=1)
@@ -140,9 +149,9 @@ class RegrasTest(TestCase):
         self.assertFalse(mesa.ocupada)
 
     def test_comandas_individuais_na_mesma_mesa(self):
-        mesa = Mesa.objects.create(identificacao='98', capacidade=4)
+        mesa = Mesa.objects.create(restaurante=self.restaurante, identificacao='98', capacidade=4)
         for nome in ['Ana', 'Bruno']:
-            Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=mesa, responsavel=nome)
+            Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.MESA, mesa=mesa, responsavel=nome)
         self.assertEqual(mesa.comandas_abertas.count(), 2)
 
     def test_excluir_prato_vendido_e_recusado(self):
@@ -187,15 +196,17 @@ class RegrasTest(TestCase):
         item.refresh_from_db()
         self.assertEqual(item.quantidade, 1)
 
-class ConstraintsTest(TestCase):
+class ConstraintsTest(TesteComRestaurante):
 
     @classmethod
     def setUpTestData(cls):
-        cls.categoria = Categoria.objects.create(nome='Cafés', ordem=1)
+        super().setUpTestData()
+        cls.categoria = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
         cls.prato = Prato.objects.create(
+            restaurante=cls.restaurante,
             nome='Espresso', preco=Decimal('6.00'), categoria=cls.categoria
         )
-        cls.mesa = Mesa.objects.create(identificacao='01', capacidade=4)
+        cls.mesa = Mesa.objects.create(restaurante=cls.restaurante, identificacao='01', capacidade=4)
 
     def _deve_bloquear(self, funcao):
         with self.assertRaises(IntegrityError):
@@ -204,46 +215,52 @@ class ConstraintsTest(TestCase):
 
     def test_preco_negativo_bloqueado(self):
         self._deve_bloquear(lambda: Prato.objects.create(
+            restaurante=self.restaurante,
             nome='Grátis', preco=Decimal('-1'), categoria=self.categoria
         ))
 
     def test_desconto_negativo_bloqueado(self):
         self._deve_bloquear(lambda: Comanda.objects.create(
+            restaurante=self.restaurante,
             tipo=Comanda.Tipo.MESA, mesa=self.mesa, desconto=Decimal('-5')
         ))
 
     def test_comanda_mesa_exige_mesa(self):
-        self._deve_bloquear(lambda: Comanda.objects.create(tipo=Comanda.Tipo.MESA))
+        self._deve_bloquear(lambda: Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.MESA))
 
     def test_comanda_viagem_nao_aceita_mesa(self):
         self._deve_bloquear(lambda: Comanda.objects.create(
+            restaurante=self.restaurante,
             tipo=Comanda.Tipo.VIAGEM, mesa=self.mesa
         ))
 
     def test_capacidade_minima_da_mesa(self):
         self._deve_bloquear(lambda: Mesa.objects.create(
+            restaurante=self.restaurante,
             identificacao='99', capacidade=0
         ))
 
     def test_estados_legitimos_continuam_passando(self):
-        Prato.objects.create(nome='Bala', preco=Decimal('0.01'), categoria=self.categoria)
-        Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
-        Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Bruno')
-        Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Carla')
+        Prato.objects.create(restaurante=self.restaurante, nome='Bala', preco=Decimal('0.01'), categoria=self.categoria)
+        Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Bruno')
+        Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Carla')
         self.assertEqual(self.mesa.comandas_abertas.count(), 2)
 
-class ResumoTest(TestCase):
+class ResumoTest(TesteComRestaurante):
 
     @classmethod
     def setUpTestData(cls):
-        cls.cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        super().setUpTestData()
+        cls.cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
         cls.espresso = Prato.objects.create(
+            restaurante=cls.restaurante,
             nome='Espresso', preco=Decimal('6.00'), categoria=cls.cat
         )
         cls.url = reverse('atendimento:resumo')
 
     def _fechada(self, quantidade, forma=Comanda.FormaPagamento.PIX):
-        comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='x')
+        comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='x')
         ItemComanda.objects.create(comanda=comanda, prato=self.espresso, quantidade=quantidade)
         comanda.fechar(forma)
         return comanda
@@ -257,9 +274,9 @@ class ResumoTest(TestCase):
     def test_soma_so_comandas_fechadas(self):
         self._fechada(2)
         self._fechada(1)
-        aberta = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='a')
+        aberta = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='a')
         ItemComanda.objects.create(comanda=aberta, prato=self.espresso, quantidade=10)
-        cancelada = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='c')
+        cancelada = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='c')
         ItemComanda.objects.create(comanda=cancelada, prato=self.espresso, quantidade=10)
         cancelada.cancelar()
         resposta = self.client.get(self.url)
@@ -287,22 +304,27 @@ class ResumoTest(TestCase):
                 self.assertEqual(resposta.status_code, 200)
                 self.assertTrue(resposta.context['eh_hoje'])
 
-class PersonalizarItemTest(TestCase):
+class PersonalizarItemTest(TesteComRestaurante):
 
     @classmethod
     def setUpTestData(cls):
-        cls.cat = Categoria.objects.create(nome='Cafés', ordem=1)
-        cls.adic = Categoria.objects.create(nome='Adicionais', ordem=9, eh_adicional=True)
+        super().setUpTestData()
+        cls.cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
+        cls.adic = Categoria.objects.create(restaurante=cls.restaurante, nome='Adicionais', ordem=9, eh_adicional=True)
         cls.espresso = Prato.objects.create(
+            restaurante=cls.restaurante,
             nome='Espresso', preco=Decimal('6.00'), categoria=cls.cat
         )
         cls.leite = Prato.objects.create(
+            restaurante=cls.restaurante,
             nome='Leite vegetal', preco=Decimal('3.00'), categoria=cls.adic
         )
-        cls.mesa = Mesa.objects.create(identificacao='01', capacidade=4)
+        cls.mesa = Mesa.objects.create(restaurante=cls.restaurante, identificacao='01', capacidade=4)
 
     def setUp(self):
+        super().setUp()
         self.comanda = Comanda.objects.create(
+            restaurante=self.restaurante,
             tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Ana'
         )
         self.url = reverse('atendimento:lancar_item', args=[self.comanda.pk])
@@ -338,6 +360,7 @@ class PersonalizarItemTest(TestCase):
 
     def test_remover_adicional_preserva_o_que_fica(self):
         chantilly = Prato.objects.create(
+            restaurante=self.restaurante,
             nome='Chantilly', preco=Decimal('3.50'), categoria=self.adic
         )
         self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
@@ -367,7 +390,7 @@ class PersonalizarItemTest(TestCase):
     def test_painel_so_abre_para_item_da_propria_comanda(self):
         self.client.post(self.url, {'acao': 'adicionar', 'prato': self.espresso.pk})
         proprio = self.comanda.itens.get()
-        outra = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Bruno')
+        outra = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Bruno')
         alheio = ItemComanda.objects.create(comanda=outra, prato=self.espresso)
 
         self.assertTrue(self._tem_painel(self.client.get(f'{self.url}?personalizar={proprio.pk}')))
@@ -378,18 +401,21 @@ class PersonalizarItemTest(TestCase):
                 self.assertFalse(self._tem_painel(resposta))
 
 
-class BlindagemTest(TestCase):
+class BlindagemTest(TesteComRestaurante):
 
     @classmethod
     def setUpTestData(cls):
-        cat = Categoria.objects.create(nome='Cafés', ordem=1)
-        adic = Categoria.objects.create(nome='Adicionais', ordem=9, eh_adicional=True)
-        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
-        cls.leite = Prato.objects.create(nome='Leite vegetal', preco=Decimal('3.00'), categoria=adic)
-        cls.mesa = Mesa.objects.create(identificacao='01', capacidade=4)
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
+        adic = Categoria.objects.create(restaurante=cls.restaurante, nome='Adicionais', ordem=9, eh_adicional=True)
+        cls.espresso = Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        cls.leite = Prato.objects.create(restaurante=cls.restaurante, nome='Leite vegetal', preco=Decimal('3.00'), categoria=adic)
+        cls.mesa = Mesa.objects.create(restaurante=cls.restaurante, identificacao='01', capacidade=4)
 
     def setUp(self):
+        super().setUp()
         self.comanda = Comanda.objects.create(
+            restaurante=self.restaurante,
             tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Ana'
         )
         self.pdv = reverse('atendimento:lancar_item', args=[self.comanda.pk])
@@ -455,15 +481,17 @@ class BlindagemTest(TestCase):
         self.assertFalse(item_admin.has_change_permission(request, item))
         self.assertFalse(item_admin.has_delete_permission(request, item))
 
-class CancelarItemTest(TestCase):
+class CancelarItemTest(TesteComRestaurante):
 
     @classmethod
     def setUpTestData(cls):
-        cat = Categoria.objects.create(nome='Cafés', ordem=1)
-        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
+        cls.espresso = Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cat)
 
     def setUp(self):
-        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        super().setUp()
+        self.comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
         self.item = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso, quantidade=2)
 
     def test_cancelar_registra_motivo_e_data(self):
@@ -524,16 +552,19 @@ class CancelarItemTest(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.status, ItemComanda.Status.EM_PREPARO)
 
-class SoPendenteAlteraTest(TestCase):
+
+class SoPendenteAlteraTest(TesteComRestaurante):
     """Item que saiu da fila não muda nem some: só o pendente é rascunho."""
 
     @classmethod
     def setUpTestData(cls):
-        cat = Categoria.objects.create(nome='Cafés', ordem=1)
-        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
+        cls.espresso = Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cat)
 
     def setUp(self):
-        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        super().setUp()
+        self.comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
         self.item = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso, quantidade=2)
         self.item.mudar_status(ItemComanda.Status.EM_PREPARO)
 
@@ -569,16 +600,19 @@ class SoPendenteAlteraTest(TestCase):
         self.client.post(pdv, {'acao': 'remover', 'item': novo.pk})
         self.assertFalse(ItemComanda.objects.filter(pk=novo.pk).exists())
 
-class CancelarItemTelaTest(TestCase):
+
+class CancelarItemTelaTest(TesteComRestaurante):
     """Consumo não some da conta: sai do total, mas fica registrado com o motivo."""
 
     @classmethod
     def setUpTestData(cls):
-        cat = Categoria.objects.create(nome='Cafés', ordem=1)
-        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
+        cls.espresso = Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cat)
 
     def setUp(self):
-        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        super().setUp()
+        self.comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
         self.item = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso)
         for status in ('EM_PREPARO', 'PRONTO', 'ENTREGUE'):
             self.item.mudar_status(status)
@@ -613,19 +647,22 @@ class CancelarItemTelaTest(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.motivo_cancelamento, 'Cliente desistiu')
 
-class LancarTest(TestCase):
+
+class LancarTest(TesteComRestaurante):
     """As regras de lançamento valem para quem chamar o model, com ou sem tela."""
 
     @classmethod
     def setUpTestData(cls):
-        cat = Categoria.objects.create(nome='Cafés', ordem=1)
-        adic = Categoria.objects.create(nome='Adicionais', ordem=9, eh_adicional=True)
-        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
-        cls.leite = Prato.objects.create(nome='Leite vegetal', preco=Decimal('3.00'), categoria=adic)
-        cls.combo = Combo.objects.create(nome='Combo manhã', preco=Decimal('10.00'), disponivel=False)
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés', ordem=1)
+        adic = Categoria.objects.create(restaurante=cls.restaurante, nome='Adicionais', ordem=9, eh_adicional=True)
+        cls.espresso = Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        cls.leite = Prato.objects.create(restaurante=cls.restaurante, nome='Leite vegetal', preco=Decimal('3.00'), categoria=adic)
+        cls.combo = Combo.objects.create(restaurante=cls.restaurante, nome='Combo manhã', preco=Decimal('10.00'), disponivel=False)
 
     def setUp(self):
-        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        super().setUp()
+        self.comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
 
     def test_lancar_agrupa_item_pendente_igual(self):
         self.comanda.lancar(self.espresso)
@@ -641,7 +678,7 @@ class LancarTest(TestCase):
         }
         for nome, (status, produto) in tentativas.items():
             with self.subTest(nome):
-                comanda = Comanda.objects.create(tipo=Comanda.Tipo.BALCAO, status=status)
+                comanda = Comanda.objects.create(restaurante=self.restaurante, tipo=Comanda.Tipo.BALCAO, status=status)
                 with self.assertRaises(ValidationError):
                     comanda.lancar(produto)
                 self.assertEqual(comanda.itens.count(), 0)

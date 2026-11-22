@@ -1,21 +1,22 @@
 from decimal import Decimal
+
 from django.db import IntegrityError, transaction
-from django.contrib.auth.models import User
-from django.test import TestCase
 from django.urls import reverse
 
+from core.para_testes import TesteComRestaurante
+
 from .forms import PratoForm
-from .models import Categoria, Prato
 from .models import Categoria, Combo, ComboItem, Prato
 
 
-class BuscaFiltroPratosTest(TestCase):
+class BuscaFiltroPratosTest(TesteComRestaurante):
     def setUp(self):
-        self.bebidas = Categoria.objects.create(nome='Bebidas', ordem=1)
-        self.doces = Categoria.objects.create(nome='Doces', ordem=2)
-        Prato.objects.create(nome='Café expresso', preco=Decimal('6.00'), categoria=self.bebidas)
-        Prato.objects.create(nome='Bolo de café', preco=Decimal('9.00'), categoria=self.doces)
-        Prato.objects.create(nome='Suco de laranja', descricao='Natural, feito na hora',
+        super().setUp()
+        self.bebidas = Categoria.objects.create(restaurante=self.restaurante, nome='Bebidas', ordem=1)
+        self.doces = Categoria.objects.create(restaurante=self.restaurante, nome='Doces', ordem=2)
+        Prato.objects.create(restaurante=self.restaurante, nome='Café expresso', preco=Decimal('6.00'), categoria=self.bebidas)
+        Prato.objects.create(restaurante=self.restaurante, nome='Bolo de café', preco=Decimal('9.00'), categoria=self.doces)
+        Prato.objects.create(restaurante=self.restaurante, nome='Suco de laranja', descricao='Natural, feito na hora',
                              preco=Decimal('8.00'), categoria=self.bebidas)
         self.url = reverse('cardapio:lista_pratos')
 
@@ -44,12 +45,13 @@ class BuscaFiltroPratosTest(TestCase):
         self.assertContains(resposta, 'Nenhum item encontrado com esses filtros')
         self.assertContains(resposta, 'value="pizza"')
 
-class VitrineFiltroTest(TestCase):
+class VitrineFiltroTest(TesteComRestaurante):
     def setUp(self):
-        self.bebidas = Categoria.objects.create(nome='Bebidas', ordem=1)
-        self.doces = Categoria.objects.create(nome='Doces', ordem=2)
-        Prato.objects.create(nome='Café expresso', preco=Decimal('6.00'), categoria=self.bebidas)
-        Prato.objects.create(nome='Bolo de café', preco=Decimal('9.00'), categoria=self.doces)
+        super().setUp()
+        self.bebidas = Categoria.objects.create(restaurante=self.restaurante, nome='Bebidas', ordem=1)
+        self.doces = Categoria.objects.create(restaurante=self.restaurante, nome='Doces', ordem=2)
+        Prato.objects.create(restaurante=self.restaurante, nome='Café expresso', preco=Decimal('6.00'), categoria=self.bebidas)
+        Prato.objects.create(restaurante=self.restaurante, nome='Bolo de café', preco=Decimal('9.00'), categoria=self.doces)
         self.url = reverse('cardapio:lista_cardapio')
 
     def test_filtro_por_categoria_na_vitrine(self):
@@ -61,20 +63,21 @@ class VitrineFiltroTest(TestCase):
         resposta = self.client.get(self.url, {'q': 'pizza'})
         self.assertContains(resposta, 'Nenhum item encontrado com esses filtros')
 
-class ComboFiltroTest(TestCase):
+class ComboFiltroTest(TesteComRestaurante):
     def setUp(self):
-        bebidas = Categoria.objects.create(nome='Bebidas', ordem=1)
-        self.doces = Categoria.objects.create(nome='Doces', ordem=2)
-        self.salgados = Categoria.objects.create(nome='Salgados', ordem=3)
-        cafe = Prato.objects.create(nome='Café expresso', preco=Decimal('6.00'), categoria=bebidas)
-        bolo = Prato.objects.create(nome='Bolo de cenoura', preco=Decimal('9.00'), categoria=self.doces)
-        pao = Prato.objects.create(nome='Pão de queijo', preco=Decimal('5.00'), categoria=self.salgados)
+        super().setUp()
+        bebidas = Categoria.objects.create(restaurante=self.restaurante, nome='Bebidas', ordem=1)
+        self.doces = Categoria.objects.create(restaurante=self.restaurante, nome='Doces', ordem=2)
+        self.salgados = Categoria.objects.create(restaurante=self.restaurante, nome='Salgados', ordem=3)
+        cafe = Prato.objects.create(restaurante=self.restaurante, nome='Café expresso', preco=Decimal('6.00'), categoria=bebidas)
+        bolo = Prato.objects.create(restaurante=self.restaurante, nome='Bolo de cenoura', preco=Decimal('9.00'), categoria=self.doces)
+        pao = Prato.objects.create(restaurante=self.restaurante, nome='Pão de queijo', preco=Decimal('5.00'), categoria=self.salgados)
 
-        manha = Combo.objects.create(nome='Combo manhã', preco=Decimal('13.00'))
+        manha = Combo.objects.create(restaurante=self.restaurante, nome='Combo manhã', preco=Decimal('13.00'))
         ComboItem.objects.create(combo=manha, prato=cafe, quantidade=1)
         ComboItem.objects.create(combo=manha, prato=bolo, quantidade=1)
 
-        lanche = Combo.objects.create(nome='Combo lanche', preco=Decimal('10.00'))
+        lanche = Combo.objects.create(restaurante=self.restaurante, nome='Combo lanche', preco=Decimal('10.00'))
         ComboItem.objects.create(combo=lanche, prato=cafe, quantidade=1)
         ComboItem.objects.create(combo=lanche, prato=pao, quantidade=1)
 
@@ -93,9 +96,10 @@ class ComboFiltroTest(TestCase):
     def test_combo_nao_se_repete(self):
         self.assertEqual(sorted(self.combos(q='combo')), ['Combo lanche', 'Combo manhã'])
 
-class ValidacaoPrecoTest(TestCase):
+class ValidacaoPrecoTest(TesteComRestaurante):
     def setUp(self):
-        self.categoria = Categoria.objects.create(nome='Bebidas')
+        super().setUp()
+        self.categoria = Categoria.objects.create(restaurante=self.restaurante, nome='Bebidas')
 
     def dados(self, preco):
         return {'nome': 'Café', 'preco': preco, 'categoria': self.categoria.pk, 'disponivel': True}
@@ -112,12 +116,12 @@ class ValidacaoPrecoTest(TestCase):
         resposta = self.client.post(reverse('cardapio:novo_prato'), self.dados('0'))
         self.assertEqual(resposta.status_code, 200)
         self.assertContains(resposta, 'maior que zero')
-        self.assertFalse(Prato.objects.exists())        
+        self.assertFalse(Prato.objects.exists())
 
     def test_banco_recusa_preco_zero(self):
         tentativas = {
-            'prato': lambda: Prato.objects.create(nome='Água', preco=Decimal('0'), categoria=self.categoria),
-            'combo': lambda: Combo.objects.create(nome='Combo grátis', preco=Decimal('0')),
+            'prato': lambda: Prato.objects.create(restaurante=self.restaurante, nome='Água', preco=Decimal('0'), categoria=self.categoria),
+            'combo': lambda: Combo.objects.create(restaurante=self.restaurante, nome='Combo grátis', preco=Decimal('0')),
         }
         for nome, criar in tentativas.items():
             with self.subTest(nome):
@@ -125,13 +129,13 @@ class ValidacaoPrecoTest(TestCase):
                     with transaction.atomic():
                         criar()
 
-class PratoApiTest(TestCase):
+
+class PratoApiTest(TesteComRestaurante):
     """A API herda as regras do model: mesma validação, resposta em JSON."""
 
     def setUp(self):
-        self.categoria = Categoria.objects.create(nome='Bebidas')
-        self.usuario = User.objects.create_user('ana', password='senha-teste')
-        self.client.force_login(self.usuario)
+        super().setUp()
+        self.categoria = Categoria.objects.create(restaurante=self.restaurante, nome='Bebidas')
         self.lista = reverse('cardapio_api:lista_pratos')
 
     def criar(self, **dados):
@@ -151,7 +155,7 @@ class PratoApiTest(TestCase):
         self.assertEqual(nomes, ['Café'])
 
     def test_regras_do_model_viram_400(self):
-        Prato.objects.create(nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
+        Prato.objects.create(restaurante=self.restaurante, nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
         casos = {
             'preco zero': ({'preco': '0'}, 'maior que zero'),
             'nome repetido ignorando maiusculas': ({'nome': 'CHÁ'}, 'Já existe'),
@@ -164,7 +168,7 @@ class PratoApiTest(TestCase):
         self.assertEqual(Prato.objects.count(), 1)
 
     def test_patch_tambem_passa_pelas_regras(self):
-        prato = Prato.objects.create(nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
+        prato = Prato.objects.create(restaurante=self.restaurante, nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
         url = reverse('cardapio_api:detalhe_prato', args=[prato.pk])
         ok = self.client.patch(url, {'preco': '5.50'}, content_type='application/json')
         self.assertEqual(ok.status_code, 200)
@@ -174,8 +178,8 @@ class PratoApiTest(TestCase):
         self.assertEqual(prato.preco, Decimal('5.50'))
 
     def test_excluir_prato_usado_em_combo_volta_400(self):
-        prato = Prato.objects.create(nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
-        combo = Combo.objects.create(nome='Combo tarde', preco=Decimal('9.00'))
+        prato = Prato.objects.create(restaurante=self.restaurante, nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
+        combo = Combo.objects.create(restaurante=self.restaurante, nome='Combo tarde', preco=Decimal('9.00'))
         ComboItem.objects.create(combo=combo, prato=prato, quantidade=1)
         resposta = self.client.delete(reverse('cardapio_api:detalhe_prato', args=[prato.pk]))
         self.assertEqual(resposta.status_code, 400)
