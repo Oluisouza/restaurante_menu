@@ -5,6 +5,7 @@ from django.urls import include, path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('contas/', include('django.contrib.auth.urls')),
     path('', include('atendimento.urls')),
     path('cardapio/', include('cardapio.urls')),
     path('api/', include('cardapio.api_urls')),

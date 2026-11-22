@@ -447,3 +447,6 @@ button {
 .item-cancelado { color: #9a8f86; }
 .item-cancelado .riscavel { text-decoration: line-through; }
 .item-cancelado .motivo { color: #8a2c14; }
+
+.sair { display: flex; align-items: center; gap: .5rem; font-size: .9rem; }
+.sair button { background: none; border: 1px solid currentColor; color: inherit; padding: .2rem .6rem; border-radius: 4px; cursor: pointer; }

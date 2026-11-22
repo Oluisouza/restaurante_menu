@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Entrar — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Entrar</h2>
+
+<div class="form-box">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="acoes">
+            <button type="submit" class="botao">Entrar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
