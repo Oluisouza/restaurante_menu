@@ -112,9 +112,11 @@ def _ajustar_item(request, comanda, acao):
     )
     descricao = item.descricao_produto
 
-    if acao != 'remover' and item.status != ItemComanda.Status.PENDENTE:
-        messages.error(request, 'Este item já foi para a cozinha. Lance o produto de novo.')
-        return
+    try:
+        item.exigir_alteravel()
+    except ValidationError as erro:
+        messages.error(request, '; '.join(erro.messages))
+        return                    # nas helpers do PDV
 
     if acao == 'incrementar':
         item.quantidade += 1
@@ -130,8 +132,11 @@ def _personalizar_item(request, comanda):
     item = get_object_or_404(
         ItemComanda, pk=_id_valido(request.POST.get('item')), comanda=comanda
     )
-    if item.status != ItemComanda.Status.PENDENTE:
-        messages.error(request, 'Este item já foi para a cozinha.')
+    
+    try:
+        item.exigir_alteravel()
+    except ValidationError as erro:
+        messages.error(request, '; '.join(erro.messages))
         return
 
     form = PersonalizarItemForm(request.POST, instance=item)
@@ -240,9 +245,11 @@ def editar_item(request, pk):
     item = get_object_or_404(ItemComanda.objects.select_related('comanda', 'comanda__mesa'), pk=pk)
     comanda = item.comanda
 
-    if not comanda.esta_aberta:
-        messages.error(request, f'A comanda {comanda.codigo} já foi encerrada.')
-        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+    try:
+        item.exigir_alteravel()
+    except ValidationError as erro:
+        messages.error(request, '; '.join(erro.messages))
+        return  redirect('atendimento:detalhe_comanda', pk=comanda.pk)
 
     if request.method == 'POST':
         form = ItemComandaForm(request.POST, instance=item)
@@ -259,13 +266,15 @@ def excluir_item(request, pk):
     item = get_object_or_404(ItemComanda.objects.select_related('comanda'), pk=pk)
     comanda = item.comanda
 
-    if not comanda.esta_aberta:
-        messages.error(request, f'A comanda {comanda.codigo} já foi encerrada.')
+    try:
+        item.exigir_alteravel()
+    except ValidationError as erro:
+        messages.error(request, '; '.join(erro.messages))
         return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
 
     if request.method == 'POST':
         descricao = item.descricao_produto
-        item.delete()
+        item.remover()
         messages.success(request, f'{descricao} removido da comanda.')
         return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
 

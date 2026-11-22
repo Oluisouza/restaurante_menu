@@ -292,6 +292,18 @@ class ItemComanda(models.Model):
         self.status = novo_status
         self.save(update_fields=['status'])
 
+    def exigir_alteravel(self):
+        if not self.comanda.esta_aberta:
+            raise ValidationError('A comanda deste item já foi encerrada.')
+        if not self.esta_pendente:
+            raise ValidationError(
+                'Este item já foi para a cozinha e não pode ser alterado nem removido.'
+            )
+
+    def remover(self):
+        self.exigir_alteravel()
+        self.delete()
+
     @classmethod
     def from_db(cls, db, field_names, values):
         instance = super().from_db(db, field_names, values)

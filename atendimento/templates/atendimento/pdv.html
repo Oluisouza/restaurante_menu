@@ -61,6 +61,7 @@
                     <a href="?personalizar={{ item.pk }}" class="link-personalizar"><small>personalizar</small></a>
                 {% endif %}
             </div>
+            {% if item.esta_pendente %}
             <form method="post" class="qtd">
                 {% csrf_token %}
                 <input type="hidden" name="item" value="{{ item.pk }}">
@@ -69,6 +70,9 @@
                 <button type="submit" name="acao" value="incrementar" title="Aumentar">+</button>
                 <button type="submit" name="acao" value="remover" class="remover" title="Remover">×</button>
             </form>
+            {% else %}
+            <div class="qtd"><span>{{ item.quantidade }}</span></div>
+            {% endif %}
             <div class="valor">R$ {{ item.total|floatformat:2 }}</div>
         </div>
         {% empty %}

@@ -41,7 +41,7 @@
         <td class="direita">R$ {{ item.total|floatformat:2 }}</td>
         <td><span class="etiqueta {{ item.status }}">{{ item.get_status_display }}</span></td>
         <td>
-            {% if comanda.esta_aberta %}
+            {% if comanda.esta_aberta and item.esta_pendente %}
             <a href="{% url 'atendimento:editar_item' item.pk %}"><small>editar</small></a> ·
             <a href="{% url 'atendimento:excluir_item' item.pk %}"><small>remover</small></a>
             {% endif %}

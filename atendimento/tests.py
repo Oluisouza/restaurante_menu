@@ -507,7 +507,7 @@ class CancelarItemTest(TestCase):
                     status=ItemComanda.Status.CANCELADO
                 )
 
-        def test_cozinha_cancela_item_com_motivo(self):
+    def test_cozinha_cancela_item_com_motivo(self):
         resposta = self.client.post(
             reverse('atendimento:cozinha'), {'item': self.item.pk, 'status': 'CANCELADO'}
         )
@@ -522,3 +522,48 @@ class CancelarItemTest(TestCase):
         self.item.mudar_status(ItemComanda.Status.EM_PREPARO)
         self.item.refresh_from_db()
         self.assertEqual(self.item.status, ItemComanda.Status.EM_PREPARO)
+
+class SoPendenteAlteraTest(TestCase):
+    """Item que saiu da fila não muda nem some: só o pendente é rascunho."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+
+    def setUp(self):
+        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        self.item = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso, quantidade=2)
+        self.item.mudar_status(ItemComanda.Status.EM_PREPARO)
+
+    def test_model_recusa_remover_item_fora_de_pendente(self):
+        with self.assertRaises(ValidationError):
+            self.item.remover()
+        self.assertTrue(ItemComanda.objects.filter(pk=self.item.pk).exists())
+
+    def test_telas_nao_alteram_item_fora_de_pendente(self):
+        pdv = reverse('atendimento:lancar_item', args=[self.comanda.pk])
+        tentativas = [
+            ('pdv remover', lambda item: (pdv, {'acao': 'remover', 'item': item.pk})),
+            ('pdv decrementar', lambda item: (pdv, {'acao': 'decrementar', 'item': item.pk})),
+            ('pdv personalizar', lambda item: (pdv, {'acao': 'personalizar', 'item': item.pk, 'quantidade': 5})),
+            ('excluir', lambda item: (reverse('atendimento:excluir_item', args=[item.pk]), {})),
+            ('editar', lambda item: (
+                reverse('atendimento:editar_item', args=[item.pk]),
+                {'prato': self.espresso.pk, 'quantidade': 5},
+            )),
+        ]
+        for nome, montar in tentativas:
+            with self.subTest(nome):
+                item = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso, quantidade=2)
+                item.mudar_status(ItemComanda.Status.EM_PREPARO)
+                self.client.post(*montar(item))
+                item = ItemComanda.objects.filter(pk=item.pk).first()
+                self.assertIsNotNone(item, 'o item foi apagado')
+                self.assertEqual(item.quantidade, 2)
+
+    def test_item_pendente_continua_removivel(self):
+        novo = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso)
+        pdv = reverse('atendimento:lancar_item', args=[self.comanda.pk])
+        self.client.post(pdv, {'acao': 'remover', 'item': novo.pk})
+        self.assertFalse(ItemComanda.objects.filter(pk=novo.pk).exists())
