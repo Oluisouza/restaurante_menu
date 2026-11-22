@@ -443,3 +443,7 @@ button {
 .painel-personalizar ul { list-style: none; }
 .painel-personalizar ul label { font-weight: 400; display: flex; align-items: center; gap: .4rem; }
 .painel-personalizar ul input { width: auto; }
+
+.item-cancelado { color: #9a8f86; }
+.item-cancelado .riscavel { text-decoration: line-through; }
+.item-cancelado .motivo { color: #8a2c14; }

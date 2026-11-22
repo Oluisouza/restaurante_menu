@@ -18,6 +18,7 @@ urlpatterns = [
 
     path('itens/<int:pk>/editar/', views.editar_item, name='editar_item'),
     path('itens/<int:pk>/excluir/', views.excluir_item, name='excluir_item'),
+    path('itens/<int:pk>/cancelar/', views.cancelar_item, name='cancelar_item'),
 
     path('mesas/<int:pk>/', views.detalhe_mesa, name='detalhe_mesa'),
 ]

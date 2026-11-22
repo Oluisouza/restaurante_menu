@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from datetime import date, timedelta
 
-from .forms import ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm
+from .forms import CancelarItemForm, ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm
 from .models import Comanda, Mesa, ItemComanda
 from cardapio.models import Categoria, Combo, Prato
 
@@ -19,7 +19,7 @@ def salao(request):
 
 def detalhe_comanda(request, pk):
     comanda = get_object_or_404(Comanda.objects.select_related('mesa'), pk=pk)
-    contexto = { 'comanda': comanda, 'itens': comanda.itens_validos.select_related('prato', 'combo'),}
+    contexto = { 'comanda': comanda, 'itens': comanda.itens.select_related('prato', 'combo'),}
     return render(request, 'atendimento/detalhe_comanda.html', contexto)
 
 def detalhe_mesa(request, pk):
@@ -355,3 +355,24 @@ def resumo(request):
         'abertas_agora': Comanda.objects.filter(status=Comanda.Status.ABERTA).count(),
     }
     return render(request, 'atendimento/resumo.html', contexto)
+
+def cancelar_item(request, pk):
+    item = get_object_or_404(ItemComanda.objects.select_related('comanda'), pk=pk)
+    comanda = item.comanda
+
+    try:
+        item.exigir_cancelavel()
+    except ValidationError as erro:
+        messages.error(request, '; '.join(erro.messages))
+        return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+
+    if request.method == 'POST':
+        form = CancelarItemForm(request.POST)
+        if form.is_valid():
+            item.cancelar(form.cleaned_data['motivo'])
+            messages.success(request, f'{item.descricao_produto} cancelado.')
+            return redirect('atendimento:detalhe_comanda', pk=comanda.pk)
+    else:
+        form = CancelarItemForm()
+
+    return render(request, 'atendimento/confirmar_cancelamento_item.html', {'form': form, 'item': item, 'comanda': comanda})

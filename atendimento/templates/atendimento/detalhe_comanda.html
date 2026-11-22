@@ -28,22 +28,29 @@
         <th class="direita">Unit.</th><th class="direita">Total</th><th>Status</th><th></th>
     </tr>
     {% for item in itens %}
-    <tr>
+    <tr{% if item.status == 'CANCELADO' %} class="item-cancelado"{% endif %}>
         <td>
-            {{ item.descricao_produto }}
+            <span class="riscavel">{{ item.descricao_produto }}</span>
             {% for adicional in item.adicionais.all %}
-                <br><small>+ {{ adicional.prato.nome }} (R$ {{ adicional.preco_unitario|floatformat:2 }})</small>
+                <br><small class="riscavel">+ {{ adicional.prato.nome }} (R$ {{ adicional.preco_unitario|floatformat:2 }})</small>
             {% endfor %}
+            {% if item.status == 'CANCELADO' %}
+                <br><small class="motivo">Motivo: {{ item.motivo_cancelamento }} · {{ item.cancelado_em|date:"H:i" }}</small>
+            {% endif %}
         </td>
         <td><small>{{ item.observacao|default:"—" }}</small></td>
-        <td class="direita">{{ item.quantidade }}</td>
-        <td class="direita">R$ {{ item.preco_unitario|floatformat:2 }}</td>
-        <td class="direita">R$ {{ item.total|floatformat:2 }}</td>
+        <td class="direita riscavel">{{ item.quantidade }}</td>
+        <td class="direita riscavel">R$ {{ item.preco_unitario|floatformat:2 }}</td>
+        <td class="direita riscavel">R$ {{ item.total|floatformat:2 }}</td>
         <td><span class="etiqueta {{ item.status }}">{{ item.get_status_display }}</span></td>
         <td>
-            {% if comanda.esta_aberta and item.esta_pendente %}
-            <a href="{% url 'atendimento:editar_item' item.pk %}"><small>editar</small></a> ·
-            <a href="{% url 'atendimento:excluir_item' item.pk %}"><small>remover</small></a>
+            {% if comanda.esta_aberta %}
+                {% if item.esta_pendente %}
+                <a href="{% url 'atendimento:editar_item' item.pk %}"><small>editar</small></a> ·
+                <a href="{% url 'atendimento:excluir_item' item.pk %}"><small>remover</small></a>
+                {% elif item.status != 'CANCELADO' %}
+                <a href="{% url 'atendimento:cancelar_item' item.pk %}"><small>cancelar</small></a>
+                {% endif %}
             {% endif %}
         </td>
     </tr>

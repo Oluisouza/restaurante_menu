@@ -268,12 +268,15 @@ class ItemComanda(models.Model):
     def esta_pendente(self):
         return self.status == self.Status.PENDENTE
 
-    def cancelar(self, motivo):
-        motivo = (motivo or '').strip()
+    def exigir_cancelavel(self):
         if not self.comanda.esta_aberta:
             raise ValidationError('A comanda deste item já foi encerrada.')
         if self.status == self.Status.CANCELADO:
             raise ValidationError('Este item já foi cancelado.')
+
+    def cancelar(self, motivo):
+        motivo = (motivo or '').strip()
+        self.exigir_cancelavel()
         if not motivo:
             raise ValidationError('Informe o motivo do cancelamento.')
         self.status = self.Status.CANCELADO

@@ -134,3 +134,10 @@ class FechamentoForm(forms.ModelForm):
         self.fields['forma_pagamento'].required = True
         if self.instance.tipo != Comanda.Tipo.MESA:
             del self.fields['taxa_servico']
+
+class CancelarItemForm(forms.Form):
+    motivo = forms.CharField(
+        label='Motivo do cancelamento',
+        max_length=200,
+        widget=forms.TextInput(attrs={'placeholder': 'Ex.: cliente desistiu, prato voltou frio'}),
+    )

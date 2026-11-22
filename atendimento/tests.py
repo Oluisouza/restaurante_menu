@@ -567,3 +567,47 @@ class SoPendenteAlteraTest(TestCase):
         pdv = reverse('atendimento:lancar_item', args=[self.comanda.pk])
         self.client.post(pdv, {'acao': 'remover', 'item': novo.pk})
         self.assertFalse(ItemComanda.objects.filter(pk=novo.pk).exists())
+
+class CancelarItemTelaTest(TestCase):
+    """Consumo não some da conta: sai do total, mas fica registrado com o motivo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cat = Categoria.objects.create(nome='Cafés', ordem=1)
+        cls.espresso = Prato.objects.create(nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+
+    def setUp(self):
+        self.comanda = Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
+        self.item = ItemComanda.objects.create(comanda=self.comanda, prato=self.espresso)
+        for status in ('EM_PREPARO', 'PRONTO', 'ENTREGUE'):
+            self.item.mudar_status(status)
+        self.url = reverse('atendimento:cancelar_item', args=[self.item.pk])
+        self.detalhe = reverse('atendimento:detalhe_comanda', args=[self.comanda.pk])
+
+    def test_cancela_item_entregue_com_motivo(self):
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        resposta = self.client.post(self.url, {'motivo': 'Prato voltou frio'})
+        self.assertRedirects(resposta, self.detalhe)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ItemComanda.Status.CANCELADO)
+        self.assertEqual(self.item.motivo_cancelamento, 'Prato voltou frio')
+        self.assertEqual(self.comanda.total, Decimal('0.00'))
+
+    def test_motivo_e_obrigatorio(self):
+        resposta = self.client.post(self.url, {'motivo': '   '})
+        self.assertEqual(resposta.status_code, 200)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ItemComanda.Status.ENTREGUE)
+
+    def test_item_cancelado_aparece_na_comanda_com_motivo(self):
+        self.item.cancelar('Cliente desistiu')
+        resposta = self.client.get(self.detalhe)
+        self.assertContains(resposta, 'item-cancelado')
+        self.assertContains(resposta, 'Cliente desistiu')
+
+    def test_nao_cancela_duas_vezes(self):
+        self.item.cancelar('Cliente desistiu')
+        resposta = self.client.post(self.url, {'motivo': 'De novo'})
+        self.assertRedirects(resposta, self.detalhe)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.motivo_cancelamento, 'Cliente desistiu')
