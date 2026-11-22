@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction
 from django.urls import reverse
 
+from core.models import Restaurante
 from core.para_testes import TesteComRestaurante
 
 from .forms import PratoForm
@@ -105,12 +106,12 @@ class ValidacaoPrecoTest(TesteComRestaurante):
         return {'nome': 'Café', 'preco': preco, 'categoria': self.categoria.pk, 'disponivel': True}
 
     def test_preco_zero_e_recusado(self):
-        form = PratoForm(self.dados('0'))
+        form = PratoForm(self.dados('0'), restaurante=self.restaurante)
         self.assertFalse(form.is_valid())
         self.assertIn('maior que zero', form.non_field_errors()[0])
 
     def test_preco_positivo_e_aceito(self):
-        self.assertTrue(PratoForm(self.dados('0.01')).is_valid())
+        self.assertTrue(PratoForm(self.dados('0.01'), restaurante=self.restaurante).is_valid())
 
     def test_post_com_preco_zero_nao_grava(self):
         resposta = self.client.post(reverse('cardapio:novo_prato'), self.dados('0'))
@@ -184,3 +185,60 @@ class PratoApiTest(TesteComRestaurante):
         resposta = self.client.delete(reverse('cardapio_api:detalhe_prato', args=[prato.pk]))
         self.assertEqual(resposta.status_code, 400)
         self.assertTrue(Prato.objects.filter(pk=prato.pk).exists())
+
+class IsolamentoCardapioTest(TesteComRestaurante):
+    """O cardápio de um restaurante não aparece nem se altera pelo outro."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.categoria = Categoria.objects.create(restaurante=cls.restaurante, nome='Bebidas')
+        Prato.objects.create(restaurante=cls.restaurante, nome='Meu prato', preco=Decimal('5.00'), categoria=cls.categoria)
+
+        cls.outro = Restaurante.objects.create(nome='Restaurante Vizinho')
+        cls.categoria_outra = Categoria.objects.create(restaurante=cls.outro, nome='Sobremesas do vizinho')
+        cls.prato_outro = Prato.objects.create(
+            restaurante=cls.outro, nome='Prato do vizinho', preco=Decimal('9.00'), categoria=cls.categoria_outra
+        )
+        Combo.objects.create(restaurante=cls.outro, nome='Combo do vizinho', preco=Decimal('12.00'))
+
+    def test_listas_mostram_so_o_proprio_restaurante(self):
+        gerenciar = self.client.get(reverse('cardapio:lista_pratos'))
+        self.assertEqual([p.nome for p in gerenciar.context['pratos']], ['Meu prato'])
+        self.assertNotContains(gerenciar, 'Sobremesas do vizinho')
+
+        vitrine = self.client.get(reverse('cardapio:lista_cardapio'))
+        self.assertContains(vitrine, 'Meu prato')
+        self.assertNotContains(vitrine, 'Prato do vizinho')
+        self.assertNotContains(vitrine, 'Combo do vizinho')
+
+    def test_prato_de_outro_restaurante_da_404(self):
+        editar = reverse('cardapio:editar_prato', args=[self.prato_outro.pk])
+        excluir = reverse('cardapio:excluir_prato', args=[self.prato_outro.pk])
+        tentativas = {
+            'abrir edicao': lambda: self.client.get(editar),
+            'salvar edicao': lambda: self.client.post(editar, {
+                'nome': 'Invadido', 'preco': '1.00', 'categoria': self.categoria.pk,
+            }),
+            'abrir exclusao': lambda: self.client.get(excluir),
+            'confirmar exclusao': lambda: self.client.post(excluir),
+        }
+        for nome, tentar in tentativas.items():
+            with self.subTest(nome):
+                self.assertEqual(tentar().status_code, 404)
+        self.prato_outro.refresh_from_db()
+        self.assertEqual(self.prato_outro.nome, 'Prato do vizinho')
+
+    def test_prato_novo_nasce_no_restaurante_do_usuario(self):
+        self.client.post(reverse('cardapio:novo_prato'), {
+            'nome': 'Suco', 'preco': '7.00', 'categoria': self.categoria.pk, 'disponivel': True,
+        })
+        self.assertEqual(Prato.objects.get(nome='Suco').restaurante, self.restaurante)
+
+    def test_categoria_de_outro_restaurante_e_recusada(self):
+        resposta = self.client.post(reverse('cardapio:novo_prato'), {
+            'nome': 'Intruso', 'preco': '7.00', 'categoria': self.categoria_outra.pk,
+        })
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn('categoria', resposta.context['form'].errors)
+        self.assertFalse(Prato.objects.filter(nome='Intruso').exists())

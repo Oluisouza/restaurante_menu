@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Prato
+from .models import Categoria, Prato
 
 class PratoForm(forms.ModelForm):
     preco = forms.DecimalField(
@@ -21,3 +21,8 @@ class PratoForm(forms.ModelForm):
         help_texts = {
             'disponivel': 'Desmarque quando o item acabar, sem precisar excluí-lo.',
         }
+
+    def __init__(self, *args, restaurante, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.restaurante = restaurante
+        self.fields['categoria'].queryset = Categoria.objects.filter(restaurante=restaurante)
