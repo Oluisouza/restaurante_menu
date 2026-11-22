@@ -50,9 +50,12 @@ class Prato(models.Model):
                 violation_error_message='Já existe um item do cardápio com esse nome.',
             ),
             models.CheckConstraint(
-                condition=models.Q(preco__gte=0),
-                name='prato_preco_nao_negativo',
-                violation_error_message='O preço não pode ser negativo.',
+                condition=models.Q(preco__gt=0),
+                name='prato_preco_positivo',
+                violation_error_message=(
+                    'O preço deve ser maior que zero. Item de cortesia se registra '
+                    'como desconto no fechamento da comanda.'
+                ),
             ),
         ]
 
@@ -81,9 +84,12 @@ class Combo(models.Model):
                 violation_error_message='Já existe um combo com esse nome.',
             ),
             models.CheckConstraint(
-                condition=models.Q(preco__gte=0),
-                name='combo_preco_nao_negativo',
-                violation_error_message='O preço não pode ser negativo.',
+                condition=models.Q(preco__gt=0),
+                name='combo_preco_positivo',
+                violation_error_message=(
+                    'O preço deve ser maior que zero. Item de cortesia se registra '
+                    'como desconto no fechamento da comanda.'
+                ),
             ),
         ]
 

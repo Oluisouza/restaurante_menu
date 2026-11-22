@@ -1,5 +1,5 @@
 from decimal import Decimal
-
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -102,7 +102,7 @@ class ValidacaoPrecoTest(TestCase):
     def test_preco_zero_e_recusado(self):
         form = PratoForm(self.dados('0'))
         self.assertFalse(form.is_valid())
-        self.assertIn('maior que zero', form.errors['preco'][0])
+        self.assertIn('maior que zero', form.non_field_errors()[0])
 
     def test_preco_positivo_e_aceito(self):
         self.assertTrue(PratoForm(self.dados('0.01')).is_valid())
@@ -112,3 +112,14 @@ class ValidacaoPrecoTest(TestCase):
         self.assertEqual(resposta.status_code, 200)
         self.assertContains(resposta, 'maior que zero')
         self.assertFalse(Prato.objects.exists())        
+
+    def test_banco_recusa_preco_zero(self):
+        tentativas = {
+            'prato': lambda: Prato.objects.create(nome='Água', preco=Decimal('0'), categoria=self.categoria),
+            'combo': lambda: Combo.objects.create(nome='Combo grátis', preco=Decimal('0')),
+        }
+        for nome, criar in tentativas.items():
+            with self.subTest(nome):
+                with self.assertRaises(IntegrityError):
+                    with transaction.atomic():
+                        criar()

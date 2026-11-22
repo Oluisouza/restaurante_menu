@@ -227,7 +227,7 @@ class ConstraintsTest(TestCase):
         ))
 
     def test_estados_legitimos_continuam_passando(self):
-        Prato.objects.create(nome='Cortesia', preco=Decimal('0'), categoria=self.categoria)
+        Prato.objects.create(nome='Bala', preco=Decimal('0.01'), categoria=self.categoria)
         Comanda.objects.create(tipo=Comanda.Tipo.VIAGEM, responsavel='Ana')
         Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Bruno')
         Comanda.objects.create(tipo=Comanda.Tipo.MESA, mesa=self.mesa, responsavel='Carla')
