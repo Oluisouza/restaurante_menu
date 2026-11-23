@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Dashboard — Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<h2>Dashboard</h2>
+<p><small>De {{ inicio|date:"d/m/Y" }} até {{ fim|date:"d/m/Y" }} · só comandas fechadas</small></p>
+
+<form class="filtros" method="get">
+    {{ form.inicio.label_tag }} {{ form.inicio }}
+    {{ form.fim.label_tag }} {{ form.fim }}
+    <button type="submit">Filtrar</button>
+    <a href="{% url 'atendimento:dashboard' %}" class="botao claro">Últimos 30 dias</a>
+</form>
+{% if form.errors %}
+<ul class="avisos">
+    {% for campo, erros in form.errors.items %}{% for erro in erros %}
+    <li class="error">{{ erro }} Mostrando os últimos 30 dias.</li>
+    {% endfor %}{% endfor %}
+</ul>
+{% endif %}
+
+<div class="cartoes">
+    <div class="cartao">
+        <small>Faturamento</small>
+        <strong>R$ {{ indicadores.faturamento|default:0|floatformat:2 }}</strong>
+    </div>
+    <div class="cartao">
+        <small>Comandas fechadas</small>
+        <strong>{{ indicadores.quantidade }}</strong>
+    </div>
+    <div class="cartao">
+        <small>Ticket médio</small>
+        <strong>R$ {{ indicadores.ticket_medio|default:0|floatformat:2 }}</strong>
+    </div>
+    <div class="cartao">
+        <small>Descontos concedidos</small>
+        <strong>R$ {{ indicadores.descontos|default:0|floatformat:2 }}</strong>
+    </div>
+</div>
+
+<div class="duas-colunas">
+    <section>
+        <h3>Mais vendidos</h3>
+        <table>
+            <tr><th>Item</th><th class="direita">Unidades</th></tr>
+            {% for linha in mais_vendidos %}
+            <tr>
+                <td>{{ linha.prato__nome|default:linha.combo__nome }}</td>
+                <td class="direita">{{ linha.unidades }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2" class="vazio">Nenhum item vendido no período.</td></tr>
+            {% endfor %}
+        </table>
+    </section>
+
+    <section>
+        <h3>Por forma de pagamento</h3>
+        <table>
+            <tr><th>Forma</th><th class="direita">Comandas</th><th class="direita">Total</th></tr>
+            {% for linha in por_pagamento %}
+            <tr>
+                <td>{{ linha.rotulo }}</td>
+                <td class="direita">{{ linha.quantidade }}</td>
+                <td class="direita">R$ {{ linha.total|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="vazio">Nenhuma venda no período.</td></tr>
+            {% endfor %}
+        </table>
+    </section>
+</div>
+{% endblock %}

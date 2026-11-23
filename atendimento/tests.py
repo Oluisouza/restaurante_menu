@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib import admin
@@ -6,6 +7,7 @@ from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from cardapio.models import Categoria, Combo, Prato
 from core.models import Restaurante
@@ -842,3 +844,62 @@ class IsolamentoItensTest(TesteComRestaurante):
         self.assertEqual(resposta.context['totais']['quantidade'], 1)
         self.assertEqual(resposta.context['totais']['faturamento'], Decimal('6.00'))
         self.assertEqual([l['prato__nome'] for l in resposta.context['mais_vendidos']], ['Meu café'])
+
+class DashboardTest(TesteComRestaurante):
+    """Números conhecidos: 2 comandas no período padrão, 1 antiga e 1 do vizinho."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés')
+        cls.espresso = Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        cls.outro = Restaurante.objects.create(nome='Restaurante Vizinho')
+        cat_outra = Categoria.objects.create(restaurante=cls.outro, nome='Cafés')
+        cls.prato_outro = Prato.objects.create(
+            restaurante=cls.outro, nome='Café do vizinho', preco=Decimal('50.00'), categoria=cat_outra
+        )
+        cls.url = reverse('atendimento:dashboard')
+
+    def _fechar(self, restaurante, prato, quantidade, dias_atras=0):
+        comanda = Comanda.objects.create(restaurante=restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='x')
+        ItemComanda.objects.create(comanda=comanda, prato=prato, quantidade=quantidade)
+        comanda.fechar(Comanda.FormaPagamento.PIX)
+        if dias_atras:
+            Comanda.objects.filter(pk=comanda.pk).update(fechada_em=timezone.now() - timedelta(days=dias_atras))
+
+    def setUp(self):
+        super().setUp()
+        self._fechar(self.restaurante, self.espresso, 2)                 # R$ 12,00 hoje
+        self._fechar(self.restaurante, self.espresso, 3, dias_atras=5)   # R$ 18,00
+        self._fechar(self.restaurante, self.espresso, 10, dias_atras=40) # R$ 60,00, fora do padrão
+        self._fechar(self.outro, self.prato_outro, 1)                    # R$ 50,00, do vizinho
+
+    def test_padrao_ultimos_30_dias_so_do_proprio_restaurante(self):
+        resposta = self.client.get(self.url)
+        indicadores = resposta.context['indicadores']
+        self.assertEqual(indicadores['quantidade'], 2)
+        self.assertEqual(indicadores['faturamento'], Decimal('30.00'))
+        self.assertEqual(indicadores['ticket_medio'], Decimal('15.00'))
+        self.assertEqual([l['unidades'] for l in resposta.context['mais_vendidos']], [5])
+
+    def test_periodo_informado_alcanca_comanda_antiga(self):
+        hoje = timezone.localdate()
+        resposta = self.client.get(self.url, {
+            'inicio': (hoje - timedelta(days=60)).isoformat(), 'fim': hoje.isoformat(),
+        })
+        self.assertEqual(resposta.context['indicadores']['quantidade'], 3)
+        self.assertEqual(resposta.context['indicadores']['faturamento'], Decimal('90.00'))
+
+    def test_periodo_sem_vendas_mostra_mensagem(self):
+        resposta = self.client.get(self.url, {'inicio': '2020-01-01', 'fim': '2020-01-31'})
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.context['indicadores']['quantidade'], 0)
+        self.assertContains(resposta, 'Nenhuma venda no período')
+
+    def test_periodo_invalido_volta_ao_padrao_com_aviso(self):
+        for dados in ({'inicio': 'abc'}, {'inicio': '2026-03-10', 'fim': '2026-03-01'}):
+            with self.subTest(dados=dados):
+                resposta = self.client.get(self.url, dados)
+                self.assertEqual(resposta.status_code, 200)
+                self.assertTrue(resposta.context['form'].errors)
+                self.assertEqual(resposta.context['indicadores']['quantidade'], 2)

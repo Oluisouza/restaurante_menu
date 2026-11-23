@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from core.utils import restaurante_atual
 
 from . import dashboard
-from .forms import CancelarItemForm, ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm
+from .forms import CancelarItemForm, ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm, PeriodoForm
 from .models import Comanda, Mesa, ItemComanda
 from cardapio.models import Categoria, Combo, Prato
 
@@ -339,6 +339,31 @@ def resumo(request):
         'abertas_agora': comandas.filter(status=Comanda.Status.ABERTA).count(),
     }
     return render(request, 'atendimento/resumo.html', contexto)
+
+DIAS_PADRAO = 30
+
+def _periodo(request):
+    """Lê o período da URL com um Form: data malformada nunca chega ao ORM."""
+    hoje = timezone.localdate()
+    padrao = {'inicio': hoje - timedelta(days=DIAS_PADRAO - 1), 'fim': hoje}
+    form = PeriodoForm(request.GET or {k: v.isoformat() for k, v in padrao.items()})
+    if form.is_valid():
+        return form, form.cleaned_data['inicio'], form.cleaned_data['fim']
+    return form, padrao['inicio'], padrao['fim']
+
+
+def painel(request):
+    form, inicio, fim = _periodo(request)
+    fechadas = dashboard.comandas_fechadas(restaurante_atual(request), inicio, fim)
+    contexto = {
+        'form': form,
+        'inicio': inicio,
+        'fim': fim,
+        'indicadores': dashboard.indicadores(fechadas),
+        'mais_vendidos': dashboard.mais_vendidos(fechadas),
+        'por_pagamento': dashboard.por_pagamento(fechadas),
+    }
+    return render(request, 'atendimento/dashboard.html', contexto)
 
 def cancelar_item(request, pk):
     item = _item_do_restaurante(request, pk)

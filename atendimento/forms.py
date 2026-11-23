@@ -145,3 +145,20 @@ class CancelarItemForm(forms.Form):
         max_length=200,
         widget=forms.TextInput(attrs={'placeholder': 'Ex.: cliente desistiu, prato voltou frio'}),
     )
+
+class PeriodoForm(forms.Form):
+    inicio = forms.DateField(
+        label='De', required=False,
+        widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+    )
+    fim = forms.DateField(
+        label='Até', required=False,
+        widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+    )
+
+    def clean(self):
+        dados = super().clean()
+        inicio, fim = dados.get('inicio'), dados.get('fim')
+        if inicio and fim and inicio > fim:
+            self.add_error('fim', 'A data final não pode ser anterior à inicial.')
+        return dados
