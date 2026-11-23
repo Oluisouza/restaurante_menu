@@ -2,13 +2,14 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import Http404
-from django.db.models import Avg, Count, Prefetch, Sum
+from django.db.models import Prefetch
 from django.utils import timezone
 
 from datetime import date, timedelta
 
 from core.utils import restaurante_atual
 
+from . import dashboard
 from .forms import CancelarItemForm, ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm
 from .models import Comanda, Mesa, ItemComanda
 from cardapio.models import Categoria, Combo, Prato
@@ -320,45 +321,18 @@ def _data_do_resumo(request):
 
 def resumo(request):
     dia = _data_do_resumo(request)
-    comandas = Comanda.objects.filter(restaurante=restaurante_atual(request))
-
-    fechadas = comandas.filter(
-        status=Comanda.Status.FECHADA, fechada_em__date=dia
-    )
-    totais = fechadas.aggregate(
-        faturamento=Sum('total_pago'),
-        quantidade=Count('id'),
-        ticket_medio=Avg('total_pago'),
-        descontos=Sum('desconto'),
-    )
-
-    rotulos = dict(Comanda.FormaPagamento.choices)
-    por_pagamento = [
-        {**linha, 'rotulo': rotulos.get(linha['forma_pagamento'], '—')}
-        for linha in (
-            fechadas.values('forma_pagamento')
-            .annotate(total=Sum('total_pago'), quantidade=Count('id'))
-            .order_by('-total')
-        )
-    ]
-
-    mais_vendidos = (
-        ItemComanda.objects
-        .filter(comanda__in=fechadas)
-        .exclude(status=ItemComanda.Status.CANCELADO)
-        .values('prato__nome', 'combo__nome')
-        .annotate(unidades=Sum('quantidade'))
-        .order_by('-unidades')[:10]
-    )
+    restaurante = restaurante_atual(request)
+    fechadas = dashboard.comandas_fechadas(restaurante, inicio=dia, fim=dia)
+    comandas = Comanda.objects.filter(restaurante=restaurante)
 
     contexto = {
         'dia': dia,
         'dia_anterior': dia - timedelta(days=1),
         'dia_seguinte': dia + timedelta(days=1),
         'eh_hoje': dia == timezone.localdate(),
-        'totais': totais,
-        'por_pagamento': por_pagamento,
-        'mais_vendidos': mais_vendidos,
+        'totais': dashboard.indicadores(fechadas),
+        'por_pagamento': dashboard.por_pagamento(fechadas),
+        'mais_vendidos': dashboard.mais_vendidos(fechadas),
         'canceladas': comandas.filter(
             status=Comanda.Status.CANCELADA, fechada_em__date=dia
         ).count(),
