@@ -755,6 +755,13 @@ class IsolamentoComandasTest(TesteComRestaurante):
                 self.assertEqual(resposta.status_code, 404)
         self.assertEqual(self.comanda.itens.count(), 0)
 
+    def test_pdv_ignora_prato_alheio_mesmo_dentro_de_categoria_propria(self):
+        categoria = Categoria.objects.get(restaurante=self.restaurante)
+        Prato.objects.create(restaurante=self.outro, nome='Prato torto', preco=Decimal('5.00'), categoria=categoria)
+        tela = self.client.get(reverse('atendimento:lancar_item', args=[self.comanda.pk]))
+        self.assertContains(tela, 'Meu café')
+        self.assertNotContains(tela, 'Prato torto')
+
     def test_model_recusa_produto_de_outro_restaurante(self):
         for produto in (self.prato_outro, self.combo_outro):
             with self.subTest(produto=produto.nome):

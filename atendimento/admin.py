@@ -5,8 +5,8 @@ from .models import Mesa, Comanda, ItemComanda, ItemAdicional
 
 @admin.register(Mesa)
 class MesaAdmin(admin.ModelAdmin):
-    list_display = ('identificacao', 'capacidade', 'ativa', 'esta_ocupada')
-    list_filter = ('ativa',)
+    list_display = ('identificacao', 'restaurante', 'capacidade', 'ativa', 'esta_ocupada')
+    list_filter = ('restaurante', 'ativa')
     search_fields = ('identificacao',)
 
     @admin.display(boolean=True, description='Ocupada')
@@ -36,8 +36,8 @@ class ItemComandaInline(admin.TabularInline):
 
 @admin.register(Comanda)
 class ComandaAdmin(admin.ModelAdmin):
-    list_display = ('codigo', 'tipo', 'mesa', 'responsavel', 'status', 'valor_total', 'aberta_em')
-    list_filter = ('status', 'tipo', 'mesa')
+    list_display = ('codigo', 'restaurante', 'tipo', 'mesa', 'responsavel', 'status', 'valor_total', 'aberta_em')
+    list_filter = ('restaurante', 'status', 'tipo', 'mesa')
     search_fields = ('codigo', 'responsavel')
     date_hierarchy = 'aberta_em'
     inlines = [ItemComandaInline]

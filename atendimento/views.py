@@ -173,7 +173,9 @@ def lancar_item(request, pk):
 
     categorias = (
         Categoria.objects.filter(restaurante=comanda.restaurante, eh_adicional=False)
-        .prefetch_related(Prefetch('pratos', queryset=Prato.objects.filter(disponivel=True)))
+        .prefetch_related(Prefetch(
+            'pratos', queryset=Prato.objects.filter(restaurante=comanda.restaurante, disponivel=True)
+        ))
     )
 
     item_personalizando = None

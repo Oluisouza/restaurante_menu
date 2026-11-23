@@ -8,13 +8,15 @@ admin.site.index_title = 'Administração do Restaurante'
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'ordem', 'eh_adicional')
+    list_display = ('nome', 'restaurante', 'ordem', 'eh_adicional')
+    list_filter = ('restaurante',)
     list_editable = ('ordem', 'eh_adicional')
     search_fields = ('nome',)
 
 @admin.register(Prato)
 class PratoAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'preco', 'categoria', 'disponivel')
+    list_display = ('nome', 'restaurante', 'preco', 'categoria', 'disponivel')
+    list_filter = ('restaurante',)
     list_editable = ('preco', 'categoria', 'disponivel')
     search_fields = ('nome', 'descricao')
     list_per_page = 25
@@ -26,7 +28,7 @@ class ComboItemInline(admin.TabularInline):
 
 @admin.register(Combo)
 class ComboAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'preco', 'preco_avulso', 'economia', 'disponivel')
-    list_filter = ('disponivel',)
+    list_display = ('nome', 'restaurante', 'preco', 'preco_avulso', 'economia', 'disponivel')
+    list_filter = ('restaurante', 'disponivel')
     search_fields = ('nome', )
     inlines = [ComboItemInline]

@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Lower
 from django.core.validators import MinValueValidator
@@ -60,6 +61,10 @@ class Prato(DoRestaurante):
                 ),
             ),
         ]
+
+    def clean(self):
+        if self.categoria_id and self.restaurante_id and self.categoria.restaurante_id != self.restaurante_id:
+            raise ValidationError({'categoria': 'A categoria precisa ser do mesmo restaurante do prato.'})
 
     def save(self, *args, **kwargs):
         self.nome = self.nome.strip()
@@ -130,6 +135,10 @@ class ComboItem(models.Model):
             models.UniqueConstraint(fields=['combo', 'prato'], name='combo_prato_unico'),
             models.CheckConstraint(condition=models.Q(quantidade__gte=1), name='comboitem_quantidade_minima',),
         ]
+
+    def clean(self):
+        if self.combo_id and self.prato_id and self.prato.restaurante_id != self.combo.restaurante_id:
+            raise ValidationError('O prato precisa ser do mesmo restaurante do combo.')
 
     def __str__(self):
         return f'{self.quantidade}x {self.prato.nome}'

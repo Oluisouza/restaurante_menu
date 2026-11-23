@@ -2,6 +2,7 @@ from decimal import Decimal
 from io import StringIO
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.urls import reverse
@@ -345,3 +346,21 @@ class UnicidadePorRestauranteTest(TesteComRestaurante):
             with self.subTest(nome):
                 restaurante = Restaurante.objects.get(nome=nome)
                 self.assertEqual(Prato.objects.filter(restaurante=restaurante).count(), 22)
+
+    def test_model_recusa_misturar_restaurantes(self):
+        categoria_outra = Categoria.objects.create(restaurante=self.outro, nome='Cafés')
+        prato_outro = Prato.objects.create(
+            restaurante=self.outro, nome='Espresso', preco=Decimal('7.00'), categoria=categoria_outra
+        )
+        tentativas = {
+            'prato na categoria de outro restaurante': Prato(
+                restaurante=self.restaurante, nome='Torto', preco=Decimal('5.00'), categoria=categoria_outra
+            ),
+            'combo com prato de outro restaurante': ComboItem(
+                combo=Combo.objects.get(restaurante=self.restaurante), prato=prato_outro, quantidade=1
+            ),
+        }
+        for nome, objeto in tentativas.items():
+            with self.subTest(nome):
+                with self.assertRaises(ValidationError):
+                    objeto.full_clean()
