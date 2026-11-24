@@ -946,6 +946,18 @@ class DashboardTest(TesteComRestaurante):
         responsaveis = [linha[4] for linha in self._linhas_do_csv(self.client.get(reverse('atendimento:exportar_csv')))]
         self.assertIn('\'=HYPERLINK("http://golpe")', responsaveis)
 
+    def test_api_devolve_os_mesmos_numeros_da_tela(self):
+        resposta = self.client.get(reverse('atendimento_api:dashboard'))
+        self.assertEqual(resposta.status_code, 200)
+        dados = resposta.json()
+        self.assertEqual(dados['indicadores']['quantidade'], 2)
+        self.assertEqual(Decimal(str(dados['indicadores']['faturamento'])), Decimal('30.00'))
+        self.assertEqual(dados['mais_vendidos'], [{'item': 'Espresso', 'unidades': 5}])
+
+    def test_api_recusa_periodo_invalido_com_400(self):
+        resposta = self.client.get(reverse('atendimento_api:dashboard'), {'inicio': 'abc'})
+        self.assertEqual(resposta.status_code, 400)
+
 
 
 class ConsultasTest(TesteComRestaurante):
