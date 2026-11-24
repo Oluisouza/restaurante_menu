@@ -8,7 +8,8 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from cardapio.models import Categoria, Combo, Prato
@@ -16,8 +17,7 @@ from core.models import Restaurante
 from core.para_testes import TesteComRestaurante
 
 from .admin import ComandaAdmin, ItemComandaAdmin
-from .models import Comanda, ItemComanda, Mesa
-
+from .models import Comanda, ItemAdicional, ItemComanda, Mesa
 
 class RotasTest(TesteComRestaurante):
     """Garante que toda tela responde 200 e que os links montam."""
@@ -945,3 +945,50 @@ class DashboardTest(TesteComRestaurante):
         comanda.fechar(Comanda.FormaPagamento.PIX)
         responsaveis = [linha[4] for linha in self._linhas_do_csv(self.client.get(reverse('atendimento:exportar_csv')))]
         self.assertIn('\'=HYPERLINK("http://golpe")', responsaveis)
+
+
+
+class ConsultasTest(TesteComRestaurante):
+    """Caça ao N+1: o número de consultas não pode crescer com o número de comandas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cat = Categoria.objects.create(restaurante=cls.restaurante, nome='Cafés')
+        adic = Categoria.objects.create(restaurante=cls.restaurante, nome='Adicionais', eh_adicional=True)
+        cls.espresso = Prato.objects.create(restaurante=cls.restaurante, nome='Espresso', preco=Decimal('6.00'), categoria=cat)
+        cls.leite = Prato.objects.create(restaurante=cls.restaurante, nome='Leite vegetal', preco=Decimal('3.00'), categoria=adic)
+
+    def _abrir_comandas(self, quantidade):
+        """Cada rodada: uma mesa com comanda e uma comanda para viagem, com item e adicional."""
+        for _ in range(quantidade):
+            proxima = Mesa.objects.count() + 1
+            mesa = Mesa.objects.create(restaurante=self.restaurante, identificacao=f'{proxima:02}')
+            for tipo, mesa_da_comanda in ((Comanda.Tipo.MESA, mesa), (Comanda.Tipo.VIAGEM, None)):
+                comanda = Comanda.objects.create(
+                    restaurante=self.restaurante, tipo=tipo, mesa=mesa_da_comanda, responsavel='Cliente', taxa_servico=True
+                )
+                item = ItemComanda.objects.create(comanda=comanda, prato=self.espresso, quantidade=2)
+                ItemAdicional.objects.create(item_comanda=item, prato=self.leite)
+
+    def _contar_consultas(self, url):
+        with CaptureQueriesContext(connection) as consultas:
+            self.client.get(url)
+        return len(consultas)
+
+    def _assert_nao_cresce(self, nome_da_rota):
+        url = reverse(nome_da_rota)
+        self._abrir_comandas(2)
+        com_poucas = self._contar_consultas(url)
+        self._abrir_comandas(8)
+        with self.assertNumQueries(com_poucas):
+            resposta = self.client.get(url)
+        return resposta
+
+    def test_lista_de_comandas_nao_cresce_com_as_comandas(self):
+        resposta = self._assert_nao_cresce('atendimento:lista_comandas')
+        self.assertContains(resposta, 'R$ 19,80', count=20)
+
+    def test_salao_nao_cresce_com_as_comandas(self):
+        resposta = self._assert_nao_cresce('atendimento:salao')
+        self.assertContains(resposta, 'R$ 19,80', count=20)

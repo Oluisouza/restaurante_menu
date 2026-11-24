@@ -17,19 +17,19 @@
 <h3>Mesas</h3>
 <div class="mesas">
     {% for mesa in mesas %}
-    <article class="mesa{% if mesa.ocupada %} mesa-ocupada{% endif %}">
+    <article class="mesa{% if mesa.abertas %} mesa-ocupada{% endif %}">
         <div class="mesa-topo">
             <a href="{% url 'atendimento:detalhe_mesa' mesa.pk %}" class="mesa-nome">{{ mesa }}</a>
-            {% if mesa.ocupada %}
+            {% if mesa.abertas %}
             <span class="etiqueta ABERTA">Ocupada</span>
             {% else %}
             <span class="etiqueta">Livre</span>
             {% endif %}
         </div>
         <p class="mesa-lugares">{{ mesa.capacidade }} lugares</p>
-        {% if mesa.ocupada %}
+        {% if mesa.abertas %}
         <ul class="mesa-comandas">
-            {% for comanda in mesa.comandas_abertas %}
+            {% for comanda in mesa.abertas %}
             <li>
                 <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">{{ comanda.responsavel|default:"Sem nome" }}</a>
                 <span class="valor">R$ {{ comanda.total|floatformat:2 }}</span>

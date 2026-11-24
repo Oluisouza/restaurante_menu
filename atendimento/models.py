@@ -29,7 +29,7 @@ class Mesa(DoRestaurante):
                 violation_error_message='A mesa precisa ter ao menos um lugar.',
             ),
         ]
-        
+
     def __str__(self):
         return f'Mesa {self.identificacao}'
 
@@ -130,7 +130,10 @@ class Comanda(DoRestaurante):
 
     @property
     def subtotal(self):
-        return sum((item.total for item in self.itens_validos), Decimal('0.00'))
+        return sum(
+            (item.total for item in self.itens.all() if item.status != ItemComanda.Status.CANCELADO),
+            Decimal('0.00'),
+        )
 
     @property
     def valor_taxa_servico(self):

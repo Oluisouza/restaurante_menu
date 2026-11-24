@@ -29,8 +29,12 @@ def _item_do_restaurante(request, pk):
 
 def salao(request):
     restaurante = restaurante_atual(request)
-    mesas = Mesa.objects.filter(restaurante=restaurante, ativa=True)
-    abertas = Comanda.objects.filter(restaurante=restaurante, status=Comanda.Status.ABERTA)
+    abertas = Comanda.objects.filter(
+        restaurante=restaurante, status=Comanda.Status.ABERTA
+    ).prefetch_related('itens__adicionais')
+    mesas = Mesa.objects.filter(restaurante=restaurante, ativa=True).prefetch_related(
+        Prefetch('comandas', queryset=abertas, to_attr='abertas')
+    )
     contexto = {'mesas': mesas, 'avulsas': abertas.filter(mesa__isnull=True), 'total_abertas': abertas.count(),}
     return render(request, 'atendimento/salao.html', contexto)
 
@@ -46,7 +50,11 @@ def detalhe_mesa(request, pk):
 
 def lista_comandas(request):
     status = request.GET.get('status', '')
-    comandas = Comanda.objects.filter(restaurante=restaurante_atual(request)).select_related('mesa')
+    comandas = (
+        Comanda.objects.filter(restaurante=restaurante_atual(request))
+        .select_related('mesa')
+        .prefetch_related('itens__adicionais')
+    )
     if status:
         comandas = comandas.filter(status=status)
     contexto = {'comandas': comandas, 'status_selecionado': status, 'status_opcoes': Comanda.Status.choices,}
