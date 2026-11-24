@@ -7,8 +7,8 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.urls import reverse
 
-from core.models import Restaurante
-from core.para_testes import TesteComRestaurante
+from core.models import Perfil, Restaurante
+from core.para_testes import TesteComRestaurante, criar_usuario
 
 from .forms import PratoForm
 from .models import Categoria, Combo, ComboItem, Prato
@@ -189,6 +189,20 @@ class PratoApiTest(TesteComRestaurante):
         resposta = self.client.delete(reverse('cardapio_api:detalhe_prato', args=[prato.pk]))
         self.assertEqual(resposta.status_code, 400)
         self.assertTrue(Prato.objects.filter(pk=prato.pk).exists())
+
+    def test_atendente_le_mas_nao_altera(self):
+        prato = Prato.objects.create(restaurante=self.restaurante, nome='Chá', preco=Decimal('5.00'), categoria=self.categoria)
+        detalhe = reverse('cardapio_api:detalhe_prato', args=[prato.pk])
+        self.client.force_login(criar_usuario('atendente', self.restaurante, papel=Perfil.Papel.ATENDENTE))
+
+        self.assertEqual(self.client.get(self.lista).status_code, 200)
+        self.assertEqual(self.client.get(detalhe).status_code, 200)
+        self.assertEqual(self.criar(nome='Suco').status_code, 403)
+        self.assertEqual(self.client.patch(detalhe, {'preco': '1.00'}, content_type='application/json').status_code, 403)
+        self.assertEqual(self.client.delete(detalhe).status_code, 403)
+        prato.refresh_from_db()
+        self.assertEqual(prato.preco, Decimal('5.00'))
+        self.assertEqual(Prato.objects.count(), 1)
 
 class IsolamentoCardapioTest(TesteComRestaurante):
     """O cardápio de um restaurante não aparece nem se altera pelo outro."""
