@@ -10,8 +10,8 @@ new Chart(document.getElementById('grafico-faturamento'), {
             label: 'Faturamento',
             // O Decimal chega como texto ("12.00") para não perder centavos no caminho.
             data: serie.map(ponto => Number(ponto.total)),
-            borderColor: '#3d2b1f',
-            backgroundColor: 'rgba(61, 43, 31, 0.08)',
+            borderColor: '#1f6f5c',
+            backgroundColor: 'rgba(31, 111, 92, 0.10)',
             fill: true,
             tension: 0.25,
             pointRadius: 2,

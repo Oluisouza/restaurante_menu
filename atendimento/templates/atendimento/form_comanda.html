@@ -1,9 +1,15 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Nova comanda — Comanda Digital{% endblock %}
+{% block titulo %}Nova comanda | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>Nova comanda · {{ rotulo_tipo }}</h2>
+<a href="{% url 'atendimento:salao' %}" class="voltar">Voltar ao salão</a>
+<div class="topo">
+    <div>
+        <h2>Nova comanda</h2>
+        <p class="subtitulo">{{ rotulo_tipo }}</p>
+    </div>
+</div>
 
 <div class="form-box">
     <form method="post">

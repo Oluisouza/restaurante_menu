@@ -1,65 +1,71 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Gerenciar cardápio — Comanda Digital{% endblock %}
+{% block titulo %}Gerenciar cardápio | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>Gerenciar cardápio</h2>
-
-<div class="acoes">
-    <a href="{% url 'cardapio:novo_prato' %}" class="botao">+ Novo item</a>
+<div class="topo">
+    <div>
+        <h2>Gerenciar cardápio</h2>
+        <p class="subtitulo">Cadastre, edite e marque itens como esgotados</p>
+    </div>
+    <div class="acoes">
+        <a href="{% url 'cardapio:novo_prato' %}" class="botao">Novo item</a>
+    </div>
 </div>
 
 <form class="filtros" method="get">
-    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por nome ou descrição...">
-    <select name="categoria">
+    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por nome ou descrição" aria-label="Buscar">
+    <select name="categoria" aria-label="Categoria">
         <option value="">Todas as categorias</option>
         {% for categoria in categorias %}
-        <option value="{{ categoria.pk }}" {% if categoria.pk|stringformat:"s" == categoria_selecionada %}selected{% endif %}>
-            {{ categoria.nome }}
-        </option>
+        <option value="{{ categoria.pk }}" {% if categoria.pk|stringformat:"s" == categoria_selecionada %}selected{% endif %}>{{ categoria.nome }}</option>
         {% endfor %}
     </select>
-    <button type="submit">Filtrar</button>
+    <button type="submit">Buscar</button>
     {% if busca or categoria_selecionada %}
-    <a href="{% url 'cardapio:lista_pratos' %}">limpar</a>
+    <a href="{% url 'cardapio:lista_pratos' %}" class="botao claro">Limpar filtros</a>
     {% endif %}
 </form>
 
-<table>
-    <tr>
-        <th>Item</th>
-        <th>Categoria</th>
-        <th class="direita">Preço</th>
-        <th>Situação</th>
-        <th></th>
-    </tr>
-    {% for prato in pratos %}
-    <tr>
-        <td>{{ prato.nome }}</td>
-        <td>{{ prato.categoria.nome }}</td>
-        <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
-        <td>
-            {% if prato.disponivel %}
-            <span class="etiqueta FECHADA">disponível</span>
-            {% else %}
-            <span class="etiqueta CANCELADA">esgotado</span>
-            {% endif %}
-        </td>
-        <td>
-            <a href="{% url 'cardapio:editar_prato' prato.pk %}"><small>editar</small></a> ·
-            <a href="{% url 'cardapio:excluir_prato' prato.pk %}"><small>excluir</small></a>
-        </td>
-    </tr>
-    {% empty %}
-    <tr>
-        <td colspan="5" class="vazio">
-            {% if busca or categoria_selecionada %}
-            Nenhum item encontrado com esses filtros.
-            {% else %}
-            Nenhum item cadastrado no cardápio.
-            {% endif %}
-        </td>
-    </tr>
-    {% endfor %}
-</table>
+<div class="tabela">
+    <table>
+        <tr>
+            <th>Item</th>
+            <th>Categoria</th>
+            <th class="direita">Preço</th>
+            <th>Situação</th>
+            <th></th>
+        </tr>
+        {% for prato in pratos %}
+        <tr>
+            <td><strong>{{ prato.nome }}</strong></td>
+            <td>{{ prato.categoria.nome }}</td>
+            <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
+            <td>
+                {% if prato.disponivel %}
+                <span class="etiqueta disponivel">Disponível</span>
+                {% else %}
+                <span class="etiqueta esgotado">Esgotado</span>
+                {% endif %}
+            </td>
+            <td>
+                <div class="links-linha">
+                    <a href="{% url 'cardapio:editar_prato' prato.pk %}">Editar</a>
+                    <a href="{% url 'cardapio:excluir_prato' prato.pk %}">Excluir</a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="vazio">
+                {% if busca or categoria_selecionada %}
+                Nenhum item encontrado com esses filtros.
+                {% else %}
+                Nenhum item cadastrado. Comece pelo botão Novo item.
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
 {% endblock %}

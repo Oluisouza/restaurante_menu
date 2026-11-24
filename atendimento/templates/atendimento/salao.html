@@ -1,52 +1,72 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Salão — Comanda Digital{% endblock %}
+{% block titulo %}Salão | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>Salão</h2>
-<div class="acoes">
-    <a href="{% url 'atendimento:nova_comanda' 'viagem' %}" class="botao">🛍 Nova · Viagem</a>
-    <a href="{% url 'atendimento:nova_comanda' 'balcao' %}" class="botao">🧾 Nova · Balcão</a>
+<div class="topo">
+    <div>
+        <h2>Salão</h2>
+        <p class="subtitulo">{{ total_abertas }} comanda{{ total_abertas|pluralize }} aberta{{ total_abertas|pluralize }} agora</p>
+    </div>
+    <div class="acoes">
+        <a href="{% url 'atendimento:nova_comanda' 'viagem' %}" class="botao claro">Nova para viagem</a>
+        <a href="{% url 'atendimento:nova_comanda' 'balcao' %}" class="botao claro">Nova no balcão</a>
+    </div>
 </div>
-<p>{{ total_abertas }} comanda{{ total_abertas|pluralize }} aberta{{ total_abertas|pluralize }}.</p>
 
 <h3>Mesas</h3>
-<div class="grade">
+<div class="mesas">
     {% for mesa in mesas %}
-    <div class="cartao {% if mesa.ocupada %}ocupada{% else %}livre{% endif %}">
-        <a href="{% url 'atendimento:detalhe_mesa' mesa.pk %}"><strong>{{ mesa }}</strong></a><br>
-        <small>{{ mesa.capacidade }} lugares</small>
-        {% for comanda in mesa.comandas_abertas %}
-        <div><small>{{ comanda.responsavel|default:"sem nome" }} — R$ {{ comanda.total|floatformat:2 }}</small></div>
-        {% empty %}
-        <div><small style="color:#5c8a3a">livre</small></div>
-        {% endfor %}
-        <div style="margin-top:.5rem">
-            <a href="{% url 'atendimento:nova_comanda' 'mesa' %}?mesa={{ mesa.pk }}"><small>+ abrir comanda</small></a>
+    <article class="mesa{% if mesa.ocupada %} mesa-ocupada{% endif %}">
+        <div class="mesa-topo">
+            <a href="{% url 'atendimento:detalhe_mesa' mesa.pk %}" class="mesa-nome">{{ mesa }}</a>
+            {% if mesa.ocupada %}
+            <span class="etiqueta ABERTA">Ocupada</span>
+            {% else %}
+            <span class="etiqueta">Livre</span>
+            {% endif %}
         </div>
-    </div>
+        <p class="mesa-lugares">{{ mesa.capacidade }} lugares</p>
+        {% if mesa.ocupada %}
+        <ul class="mesa-comandas">
+            {% for comanda in mesa.comandas_abertas %}
+            <li>
+                <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">{{ comanda.responsavel|default:"Sem nome" }}</a>
+                <span class="valor">R$ {{ comanda.total|floatformat:2 }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        <a href="{% url 'atendimento:nova_comanda' 'mesa' %}?mesa={{ mesa.pk }}" class="botao claro pequeno">Abrir outra comanda</a>
+        {% else %}
+        <a href="{% url 'atendimento:nova_comanda' 'mesa' %}?mesa={{ mesa.pk }}" class="botao pequeno">Abrir comanda</a>
+        {% endif %}
+    </article>
+    {% empty %}
+    <p class="vazio">Nenhuma mesa cadastrada. As mesas são cadastradas pelo Admin.</p>
     {% endfor %}
 </div>
 
 <h3>Viagem e balcão</h3>
 {% if avulsas %}
-<table>
-    <tr>
-        <th>Código</th>
-        <th>Tipo</th>
-        <th>Responsável</th>
-        <th class="direita">Total</th>
-    </tr>
-    {% for comanda in avulsas %}
-    <tr>
-        <td><a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">{{ comanda.codigo }}</a></td>
-        <td>{{ comanda.get_tipo_display }}</td>
-        <td>{{ comanda.responsavel|default:"—" }}</td>
-        <td class="direita">R$ {{ comanda.total|floatformat:2 }}</td>
-    </tr>
-    {% endfor %}
-</table>
+<div class="tabela">
+    <table>
+        <tr>
+            <th>Comanda</th>
+            <th>Tipo</th>
+            <th>Responsável</th>
+            <th class="direita">Total</th>
+        </tr>
+        {% for comanda in avulsas %}
+        <tr>
+            <td><a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="codigo">{{ comanda.codigo }}</a></td>
+            <td>{{ comanda.get_tipo_display }}</td>
+            <td>{{ comanda.responsavel|default:"Sem nome" }}</td>
+            <td class="direita">R$ {{ comanda.total|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
 {% else %}
-<p class="vazio">Nenhum pedido de viagem em aberto.</p>
+<p class="vazio">Nenhum pedido de viagem ou balcão em aberto.</p>
 {% endif %}
 {% endblock %}

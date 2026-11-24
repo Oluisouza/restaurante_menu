@@ -1,39 +1,45 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Cardápio — Comanda Digital{% endblock %}
+{% block titulo %}Cardápio | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>Cardápio</h2>
+<div class="topo">
+    <div>
+        <h2>Cardápio</h2>
+        <p class="subtitulo">Itens disponíveis para venda agora</p>
+    </div>
+</div>
 
 <form class="filtros" method="get">
-    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por nome ou descrição...">
-    <select name="categoria">
+    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por nome ou descrição" aria-label="Buscar">
+    <select name="categoria" aria-label="Categoria">
         <option value="">Todas as categorias</option>
         {% for categoria in categorias %}
-        <option value="{{ categoria.pk }}" {% if categoria.pk|stringformat:"s" == categoria_selecionada %}selected{% endif %}>
-            {{ categoria.nome }}
-        </option>
+        <option value="{{ categoria.pk }}" {% if categoria.pk|stringformat:"s" == categoria_selecionada %}selected{% endif %}>{{ categoria.nome }}</option>
         {% endfor %}
     </select>
-    <button type="submit">Filtrar</button>
+    <button type="submit">Buscar</button>
     {% if busca or categoria_selecionada %}
-    <a href="{% url 'cardapio:lista_cardapio' %}">limpar</a>
+    <a href="{% url 'cardapio:lista_cardapio' %}" class="botao claro">Limpar filtros</a>
     {% endif %}
 </form>
 
 {% for secao in secoes %}
-<h3>{{ secao.categoria.nome }}</h3>
-<table>
-    {% for prato in secao.pratos %}
-    <tr>
-        <td>
-            <strong>{{ prato.nome }}</strong>
-            {% if prato.descricao %}<br><small>{{ prato.descricao }}</small>{% endif %}
-        </td>
-        <td class="direita">R$ {{ prato.preco|floatformat:2 }}</td>
-    </tr>
-    {% endfor %}
-</table>
+<section class="secao-cardapio">
+    <h3>{{ secao.categoria.nome }}</h3>
+    <ul class="itens-cardapio">
+        {% for prato in secao.pratos %}
+        <li class="item-cardapio">
+            <div>
+                <span class="nome">{{ prato.nome }}</span>
+                {% if prato.descricao %}<span class="descricao">{{ prato.descricao }}</span>{% endif %}
+            </div>
+            <span class="pontilhado" aria-hidden="true"></span>
+            <span class="valor">R$ {{ prato.preco|floatformat:2 }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
 {% empty %}
 <p class="vazio">
     {% if busca or categoria_selecionada %}
@@ -45,17 +51,18 @@
 {% endfor %}
 
 <h3>Combos</h3>
-<div class="grade">
+<div class="combos">
     {% for combo in combos %}
-    <div class="cartao">
-        <strong>{{ combo.nome }}</strong><br>
-        <small>
-            {% for item in combo.itens.all %}{{ item.quantidade }}× {{ item.prato.nome }}<br>{% endfor %}
-        </small>
-        <p>R$ {{ combo.preco|floatformat:2 }}
-            <small style="color:#5c8a3a">(economia de R$ {{ combo.economia|floatformat:2 }})</small>
-        </p>
-    </div>
+    <article class="combo">
+        <h4>{{ combo.nome }}</h4>
+        <ul>
+            {% for item in combo.itens.all %}<li>{{ item.quantidade }}× {{ item.prato.nome }}</li>{% endfor %}
+        </ul>
+        <div class="combo-preco">
+            <span class="valor">R$ {{ combo.preco|floatformat:2 }}</span>
+            {% if combo.economia > 0 %}<span class="economia">Economia de R$ {{ combo.economia|floatformat:2 }}</span>{% endif %}
+        </div>
+    </article>
     {% empty %}
     <p class="vazio">
         {% if busca or categoria_selecionada %}
@@ -63,6 +70,7 @@
         {% else %}
         Nenhum combo cadastrado.
         {% endif %}
-    </p> {% endfor %}
+    </p>
+    {% endfor %}
 </div>
 {% endblock %}

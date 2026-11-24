@@ -1,78 +1,97 @@
 {% extends 'base.html' %}
 
-{% block titulo %}{{ comanda.codigo }} — Comanda Digital{% endblock %}
+{% block titulo %}{{ comanda.codigo }} | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>{{ comanda.codigo }}
-    <span class="etiqueta {{ comanda.status }}">{{ comanda.get_status_display }}</span>
-</h2>
-{% if comanda.esta_aberta %}
-<div class="acoes">
-    <a href="{% url 'atendimento:lancar_item' comanda.pk %}" class="botao">+ Lançar pedido</a>
-    <a href="{% url 'atendimento:fechar_comanda' comanda.pk %}" class="botao">Fechar conta</a>
-    <a href="{% url 'atendimento:cancelar_comanda' comanda.pk %}" class="botao claro">Cancelar comanda</a>
-</div>
-{% endif %}
-<p>
-    {{ comanda.get_tipo_display }}
-    {% if comanda.mesa %}— {{ comanda.mesa }}{% endif %}
-    — {{ comanda.responsavel|default:"sem nome" }}
-</p>
-<p><small>Aberta em {{ comanda.aberta_em|date:"d/m/Y H:i" }}
-        {% if comanda.fechada_em %}· Fechada em {{ comanda.fechada_em|date:"d/m/Y H:i" }}{% endif %}</small></p>
+<a href="{% url 'atendimento:lista_comandas' %}" class="voltar">Voltar às comandas</a>
 
-<h3>Itens</h3>
-<table>
-    <tr>
-        <th>Item</th><th>Obs.</th><th class="direita">Qtd</th>
-        <th class="direita">Unit.</th><th class="direita">Total</th><th>Status</th><th></th>
-    </tr>
-    {% for item in itens %}
-    <tr{% if item.status == 'CANCELADO' %} class="item-cancelado"{% endif %}>
-        <td>
-            <span class="riscavel">{{ item.descricao_produto }}</span>
-            {% for adicional in item.adicionais.all %}
-                <br><small class="riscavel">+ {{ adicional.prato.nome }} (R$ {{ adicional.preco_unitario|floatformat:2 }})</small>
-            {% endfor %}
-            {% if item.status == 'CANCELADO' %}
-                <br><small class="motivo">Motivo: {{ item.motivo_cancelamento }} · {{ item.cancelado_em|date:"H:i" }}</small>
-            {% endif %}
-        </td>
-        <td><small>{{ item.observacao|default:"—" }}</small></td>
-        <td class="direita riscavel">{{ item.quantidade }}</td>
-        <td class="direita riscavel">R$ {{ item.preco_unitario|floatformat:2 }}</td>
-        <td class="direita riscavel">R$ {{ item.total|floatformat:2 }}</td>
-        <td><span class="etiqueta {{ item.status }}">{{ item.get_status_display }}</span></td>
-        <td>
-            {% if comanda.esta_aberta %}
-                {% if item.esta_pendente %}
-                <a href="{% url 'atendimento:editar_item' item.pk %}"><small>editar</small></a> ·
-                <a href="{% url 'atendimento:excluir_item' item.pk %}"><small>remover</small></a>
-                {% elif item.status != 'CANCELADO' %}
-                <a href="{% url 'atendimento:cancelar_item' item.pk %}"><small>cancelar</small></a>
-                {% endif %}
-            {% endif %}
-        </td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="7" class="vazio">Nenhum item lançado ainda.</td></tr>
-    {% endfor %}
-</table>
+<div class="colunas">
+    <section>
+        <div class="topo">
+            <div>
+                <h2>{{ comanda.responsavel|default:"Sem nome" }}</h2>
+                <p class="subtitulo">
+                    {% if comanda.mesa %}{{ comanda.mesa }}{% else %}{{ comanda.get_tipo_display }}{% endif %},
+                    aberta em {{ comanda.aberta_em|date:"d/m/Y H:i" }}{% if comanda.fechada_em %}, encerrada em {{ comanda.fechada_em|date:"d/m/Y H:i" }}{% endif %}
+                </p>
+            </div>
+        </div>
 
-<div class="totais">
-    <div><span>Subtotal</span><span>R$ {{ comanda.subtotal|floatformat:2 }}</span></div>
-    {% if comanda.taxa_servico %}
-    <div><span>Taxa de serviço (10%)</span><span>R$ {{ comanda.valor_taxa_servico|floatformat:2 }}</span></div>
-    {% endif %}
-    {% if comanda.desconto %}
-    <div><span>Desconto</span><span>− R$ {{ comanda.desconto|floatformat:2 }}</span></div>
-    {% endif %}
-    <div class="final"><span>Total</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
-    {% if comanda.total_pago %}
-    <div style="margin-top:.75rem; border-top:1px dashed #ccc; padding-top:.75rem">
-        <span>Pago em {{ comanda.get_forma_pagamento_display }}</span>
-        <span><strong>R$ {{ comanda.total_pago|floatformat:2 }}</strong></span>
-    </div>
-    {% endif %}
+        <div class="tabela">
+            <table>
+                <tr>
+                    <th>Item</th>
+                    <th class="direita">Qtd</th>
+                    <th class="direita">Unit.</th>
+                    <th class="direita">Total</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+                {% for item in itens %}
+                <tr{% if item.status == 'CANCELADO' %} class="item-cancelado"{% endif %}>
+                    <td>
+                        <span class="riscavel">{{ item.descricao_produto }}</span>
+                        {% for adicional in item.adicionais.all %}
+                        <small class="riscavel">+ {{ adicional.prato.nome }} (R$ {{ adicional.preco_unitario|floatformat:2 }})</small>
+                        {% endfor %}
+                        {% if item.observacao %}<small>{{ item.observacao }}</small>{% endif %}
+                        {% if item.status == 'CANCELADO' %}
+                        <small class="motivo">Cancelado às {{ item.cancelado_em|date:"H:i" }}: {{ item.motivo_cancelamento }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="direita riscavel">{{ item.quantidade }}</td>
+                    <td class="direita riscavel">R$ {{ item.preco_unitario|floatformat:2 }}</td>
+                    <td class="direita riscavel">R$ {{ item.total|floatformat:2 }}</td>
+                    <td><span class="etiqueta {{ item.status }}">{{ item.get_status_display }}</span></td>
+                    <td>
+                        {% if comanda.esta_aberta %}
+                        <div class="links-linha">
+                            {% if item.esta_pendente %}
+                            <a href="{% url 'atendimento:editar_item' item.pk %}">Editar</a>
+                            <a href="{% url 'atendimento:excluir_item' item.pk %}">Remover</a>
+                            {% elif item.status != 'CANCELADO' %}
+                            <a href="{% url 'atendimento:cancelar_item' item.pk %}">Cancelar</a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="vazio">Nenhum item lançado ainda.</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+    </section>
+
+    <aside class="comanda-papel">
+        <div class="comanda-cabeca">
+            <span class="codigo">{{ comanda.codigo }}</span>
+            <span class="etiqueta {{ comanda.status }}">{{ comanda.get_status_display }}</span>
+        </div>
+        <p class="comanda-meta">{% if comanda.mesa %}{{ comanda.mesa }}{% else %}{{ comanda.get_tipo_display }}{% endif %}</p>
+        <hr class="picote">
+        <div class="conta">
+            <div><span>Subtotal</span><span>R$ {{ comanda.subtotal|floatformat:2 }}</span></div>
+            {% if comanda.taxa_servico %}
+            <div><span>Taxa de serviço (10%)</span><span>R$ {{ comanda.valor_taxa_servico|floatformat:2 }}</span></div>
+            {% endif %}
+            {% if comanda.desconto %}
+            <div><span>Desconto</span><span>− R$ {{ comanda.desconto|floatformat:2 }}</span></div>
+            {% endif %}
+            <div class="total"><span>Total</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
+            {% if comanda.total_pago %}
+            <div><span>Pago em {{ comanda.get_forma_pagamento_display }}</span><span>R$ {{ comanda.total_pago|floatformat:2 }}</span></div>
+            {% endif %}
+        </div>
+        {% if comanda.esta_aberta %}
+        <div class="acoes">
+            <a href="{% url 'atendimento:lancar_item' comanda.pk %}" class="botao">Lançar pedido</a>
+            <a href="{% url 'atendimento:fechar_comanda' comanda.pk %}" class="botao claro">Fechar conta</a>
+        </div>
+        <div class="acoes">
+            <a href="{% url 'atendimento:cancelar_comanda' comanda.pk %}">Cancelar comanda</a>
+        </div>
+        {% endif %}
+    </aside>
 </div>
 {% endblock %}

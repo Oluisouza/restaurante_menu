@@ -1,26 +1,29 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Cancelar item — {{ comanda.codigo }}{% endblock %}
+{% block titulo %}Cancelar item | {{ comanda.codigo }}{% endblock %}
 
 {% block conteudo %}
-<h2>Cancelar item</h2>
+<a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="voltar">Voltar à comanda</a>
+<div class="topo">
+    <div>
+        <h2>Cancelar item</h2>
+        <p class="subtitulo"><span class="codigo">{{ comanda.codigo }}</span>, {{ comanda.responsavel|default:"sem nome" }}</p>
+    </div>
+</div>
 
 <div class="form-box">
     <p>
-        Cancelar <strong>{{ item.quantidade }}× {{ item.descricao_produto }}</strong>
-        ({{ item.get_status_display|lower }}) da comanda <strong>{{ comanda.codigo }}</strong>?
-    </p>
-    <p>
-        O item sai do total (R$ {{ item.total|floatformat:2 }}), mas continua registrado
-        na comanda com o motivo informado.
+        Cancelar <strong>{{ item.quantidade }}× {{ item.descricao_produto }}</strong>,
+        que está {{ item.get_status_display|lower }}?
+        O item sai do total (R$ {{ item.total|floatformat:2 }}), mas continua registrado na comanda com o motivo.
     </p>
 
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
         <div class="acoes">
-            <button type="submit" class="botao">Cancelar item</button>
-            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Voltar</a>
+            <button type="submit" class="botao perigo">Cancelar item</button>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Manter item</a>
         </div>
     </form>
 </div>

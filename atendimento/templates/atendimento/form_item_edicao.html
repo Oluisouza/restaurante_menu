@@ -1,10 +1,15 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Editar item — {{ comanda.codigo }}{% endblock %}
+{% block titulo %}Editar item | {{ comanda.codigo }}{% endblock %}
 
 {% block conteudo %}
-<h2>Editar item</h2>
-<p>{{ comanda.codigo }} · {{ comanda.responsavel|default:"sem nome" }}</p>
+<a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="voltar">Voltar à comanda</a>
+<div class="topo">
+    <div>
+        <h2>Editar item</h2>
+        <p class="subtitulo"><span class="codigo">{{ comanda.codigo }}</span>, {{ comanda.responsavel|default:"sem nome" }}</p>
+    </div>
+</div>
 
 <div class="form-box">
     <form method="post">

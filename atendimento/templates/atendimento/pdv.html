@@ -1,37 +1,37 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Lançar pedido — {{ comanda.codigo }}{% endblock %}
+{% block titulo %}Lançar pedido | {{ comanda.codigo }}{% endblock %}
 
 {% block conteudo %}
-<h2>{{ comanda.codigo }}</h2>
-<p>
-    {% if comanda.mesa %}{{ comanda.mesa }}{% else %}{{ comanda.get_tipo_display }}{% endif %}
-    · {{ comanda.responsavel|default:"sem nome" }}
-</p>
+<div class="colunas">
+    <section>
+        <div class="topo">
+            <div>
+                <h2>Lançar pedido</h2>
+                <p class="subtitulo">Toque em um item para adicioná-lo à comanda</p>
+            </div>
+        </div>
 
-<div class="pdv">
-
-    <div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="adicionar">
 
             {% for categoria in categorias %}
-                {% if categoria.pratos.all %}
-                <h3>{{ categoria.nome }}</h3>
-                <div class="grade-produtos">
-                    {% for prato in categoria.pratos.all %}
-                    <button type="submit" name="prato" value="{{ prato.pk }}" class="produto">
-                        <strong>{{ prato.nome }}</strong>
-                        <small>R$ {{ prato.preco|floatformat:2 }}</small>
-                    </button>
-                    {% endfor %}
-                </div>
-                {% endif %}
+            {% if categoria.pratos.all %}
+            <h3 class="categoria-titulo">{{ categoria.nome }}</h3>
+            <div class="grade-produtos">
+                {% for prato in categoria.pratos.all %}
+                <button type="submit" name="prato" value="{{ prato.pk }}" class="produto">
+                    <strong>{{ prato.nome }}</strong>
+                    <small>R$ {{ prato.preco|floatformat:2 }}</small>
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endfor %}
 
             {% if combos %}
-            <h3>Combos</h3>
+            <h3 class="categoria-titulo">Combos</h3>
             <div class="grade-produtos">
                 {% for combo in combos %}
                 <button type="submit" name="combo" value="{{ combo.pk }}" class="produto combo-btn">
@@ -42,33 +42,41 @@
             </div>
             {% endif %}
         </form>
-    </div>
+    </section>
 
-    <div class="carrinho">
-        <h3>Comanda</h3>
+    <aside class="carrinho comanda-papel">
+        <div class="comanda-cabeca">
+            <span class="codigo">{{ comanda.codigo }}</span>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}">Ver comanda</a>
+        </div>
+        <p class="comanda-meta">
+            {% if comanda.mesa %}{{ comanda.mesa }}{% else %}{{ comanda.get_tipo_display }}{% endif %},
+            {{ comanda.responsavel|default:"sem nome" }}
+        </p>
+        <hr class="picote">
 
         {% for item in itens %}
         <div class="linha-item">
             <div class="nome">
                 {{ item.descricao_produto }}
                 {% for adicional in item.adicionais.all %}
-                    <small>+ {{ adicional.prato.nome }}</small>
+                <small>+ {{ adicional.prato.nome }}</small>
                 {% endfor %}
                 {% if item.observacao %}<small>{{ item.observacao }}</small>{% endif %}
                 {% if item.status != 'PENDENTE' %}
-                    <small>{{ item.get_status_display }}</small>
+                <small>{{ item.get_status_display }}</small>
                 {% else %}
-                    <a href="?personalizar={{ item.pk }}" class="link-personalizar"><small>personalizar</small></a>
+                <a href="?personalizar={{ item.pk }}" class="link-personalizar"><small>Personalizar</small></a>
                 {% endif %}
             </div>
             {% if item.esta_pendente %}
             <form method="post" class="qtd">
                 {% csrf_token %}
                 <input type="hidden" name="item" value="{{ item.pk }}">
-                <button type="submit" name="acao" value="decrementar" title="Diminuir">−</button>
+                <button type="submit" name="acao" value="decrementar" title="Diminuir" aria-label="Diminuir">−</button>
                 <span>{{ item.quantidade }}</span>
-                <button type="submit" name="acao" value="incrementar" title="Aumentar">+</button>
-                <button type="submit" name="acao" value="remover" class="remover" title="Remover">×</button>
+                <button type="submit" name="acao" value="incrementar" title="Aumentar" aria-label="Aumentar">+</button>
+                <button type="submit" name="acao" value="remover" class="remover" title="Remover" aria-label="Remover">×</button>
             </form>
             {% else %}
             <div class="qtd"><span>{{ item.quantidade }}</span></div>
@@ -76,24 +84,12 @@
             <div class="valor">R$ {{ item.total|floatformat:2 }}</div>
         </div>
         {% empty %}
-        <p class="vazio">Clique nos produtos para lançar.</p>
+        <p class="vazio">Comanda vazia. Toque nos itens ao lado para lançar.</p>
         {% endfor %}
-
-        <div class="total-carrinho">
-            <span>Total</span>
-            <span>R$ {{ comanda.total|floatformat:2 }}</span>
-        </div>
-
-        <div class="acoes" style="margin-top:1rem">
-            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Ver comanda</a>
-            {% if itens %}
-            <a href="{% url 'atendimento:fechar_comanda' comanda.pk %}" class="botao">Fechar conta</a>
-            {% endif %}
-        </div>
 
         {% if item_personalizando %}
         <div class="painel-personalizar">
-            <h4>{{ item_personalizando.descricao_produto }}</h4>
+            <h4>Personalizar {{ item_personalizando.descricao_produto }}</h4>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="acao" value="personalizar">
@@ -106,7 +102,16 @@
             </form>
         </div>
         {% endif %}
-    </div>
 
+        <div class="conta">
+            <div class="total"><span>Total</span><span>R$ {{ comanda.total|floatformat:2 }}</span></div>
+        </div>
+
+        {% if itens %}
+        <div class="acoes">
+            <a href="{% url 'atendimento:fechar_comanda' comanda.pk %}" class="botao">Fechar conta</a>
+        </div>
+        {% endif %}
+    </aside>
 </div>
 {% endblock %}

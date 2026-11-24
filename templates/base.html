@@ -5,30 +5,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block titulo %}Comanda Digital{% endblock%}</title>
+    <title>{% block titulo %}Comanda Digital{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:wght@400;600&family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap">
     <link rel="stylesheet" href="{% static 'css/estilo.css' %}">
 </head>
 
 <body>
-    <header>
-        <h1>☕ Comanda Digital</h1>
-        {% if user.is_authenticated %}
-        <nav>
-            <a href="{% url 'atendimento:salao' %}">Salão</a>
-            <a href="{% url 'atendimento:lista_comandas' %}">Comandas</a>
-            <a href="{% url 'atendimento:cozinha' %}">Cozinha</a>
-            <a href="{% url 'atendimento:resumo' %}">Resumo</a>
-            <a href="{% url 'atendimento:dashboard' %}">Dashboard</a>
-            <a href="{% url 'cardapio:lista_cardapio' %}">Cardápio</a>
-            <a href="{% url 'cardapio:lista_pratos' %}">Gerenciar</a>
-            <a href="/admin/">Admin</a>
-        </nav>
-        <form method="post" action="{% url 'logout' %}" class="sair">
-            {% csrf_token %}
-            <span>{{ user.username }}</span>
-            <button type="submit">Sair</button>
-        </form>
-        {% endif %}
+    <header class="barra">
+        <div class="barra-conteudo">
+            <a class="marca" href="{% url 'atendimento:salao' %}">
+                <svg viewBox="0 0 28 28" aria-hidden="true">
+                    <path d="M5 3h18v21l-3-2.2-3 2.2-3-2.2-3 2.2-3-2.2L5 24z" fill="currentColor"/>
+                    <path d="M9.5 9h9M9.5 13h9M9.5 17h5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Comanda Digital
+            </a>
+
+            {% if user.is_authenticated %}
+            {% if user.perfil.restaurante %}<span class="restaurante">{{ user.perfil.restaurante.nome }}</span>{% endif %}
+
+            {% with atual=request.resolver_match.view_name %}
+            <nav class="menu" aria-label="Menu principal">
+                <div class="menu-grupo">
+                    <a href="{% url 'atendimento:salao' %}" {% if atual == 'atendimento:salao' or atual == 'atendimento:detalhe_mesa' %}aria-current="page"{% endif %}>Salão</a>
+                    <a href="{% url 'atendimento:lista_comandas' %}" {% if atual in 'atendimento:lista_comandas atendimento:detalhe_comanda atendimento:nova_comanda atendimento:lancar_item atendimento:fechar_comanda atendimento:cancelar_comanda atendimento:editar_item atendimento:excluir_item atendimento:cancelar_item' %}aria-current="page"{% endif %}>Comandas</a>
+                    <a href="{% url 'atendimento:cozinha' %}" {% if atual == 'atendimento:cozinha' %}aria-current="page"{% endif %}>Cozinha</a>
+                </div>
+                <div class="menu-grupo">
+                    <a href="{% url 'atendimento:resumo' %}" {% if atual == 'atendimento:resumo' %}aria-current="page"{% endif %}>Resumo do dia</a>
+                    <a href="{% url 'atendimento:dashboard' %}" {% if atual == 'atendimento:dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+                    <a href="{% url 'cardapio:lista_cardapio' %}" {% if atual == 'cardapio:lista_cardapio' %}aria-current="page"{% endif %}>Cardápio</a>
+                    <a href="{% url 'cardapio:lista_pratos' %}" {% if atual in 'cardapio:lista_pratos cardapio:novo_prato cardapio:editar_prato cardapio:excluir_prato' %}aria-current="page"{% endif %}>Gerenciar cardápio</a>
+                    <a href="/admin/">Admin</a>
+                </div>
+            </nav>
+            {% endwith %}
+
+            <form method="post" action="{% url 'logout' %}" class="sair">
+                {% csrf_token %}
+                <span>{{ user.username }}</span>
+                <button type="submit">Sair</button>
+            </form>
+            {% endif %}
+        </div>
     </header>
 
     <main>

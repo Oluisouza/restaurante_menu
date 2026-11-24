@@ -1,23 +1,28 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Remover item — {{ comanda.codigo }}{% endblock %}
+{% block titulo %}Remover item | {{ comanda.codigo }}{% endblock %}
 
 {% block conteudo %}
-<h2>Remover item</h2>
+<a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="voltar">Voltar à comanda</a>
+<div class="topo">
+    <div>
+        <h2>Remover item</h2>
+        <p class="subtitulo"><span class="codigo">{{ comanda.codigo }}</span>, {{ comanda.responsavel|default:"sem nome" }}</p>
+    </div>
+</div>
 
 <div class="form-box">
     <p>
         Remover <strong>{{ item.quantidade }}× {{ item.descricao_produto }}</strong>
-        {% if item.observacao %}({{ item.observacao }}){% endif %}
-        da comanda <strong>{{ comanda.codigo }}</strong>?
+        {% if item.observacao %}({{ item.observacao }}){% endif %}, no valor de R$ {{ item.total|floatformat:2 }}?
+        O item ainda não foi para a cozinha, então sai da comanda sem deixar registro.
     </p>
-    <p>Valor do item: R$ {{ item.total|floatformat:2 }}. <strong>Esta ação não pode ser desfeita.</strong></p>
 
     <form method="post">
         {% csrf_token %}
         <div class="acoes">
-            <button type="submit" class="botao">Sim, remover</button>
-            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Voltar</a>
+            <button type="submit" class="botao perigo">Remover item</button>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Manter item</a>
         </div>
     </form>
 </div>

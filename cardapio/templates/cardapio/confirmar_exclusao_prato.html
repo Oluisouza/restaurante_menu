@@ -1,25 +1,28 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Excluir {{ prato.nome }}{% endblock %}
+{% block titulo %}Excluir {{ prato.nome }} | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>Excluir item do cardápio</h2>
+<a href="{% url 'cardapio:lista_pratos' %}" class="voltar">Voltar ao cardápio</a>
+<div class="topo">
+    <div>
+        <h2>Excluir item do cardápio</h2>
+        <p class="subtitulo">{{ prato.nome }}, {{ prato.categoria.nome }}, R$ {{ prato.preco|floatformat:2 }}</p>
+    </div>
+</div>
 
 <div class="form-box">
     <p>
-        Excluir <strong>{{ prato.nome }}</strong>
-        ({{ prato.categoria.nome }} · R$ {{ prato.preco|floatformat:2 }}) do cardápio?
-    </p>
-    <p>
-        Se o item já foi vendido ou faz parte de um combo, o sistema vai recusar.
-        Nesse caso, prefira <a href="{% url 'cardapio:editar_prato' prato.pk %}">marcá-lo como indisponível</a>.
+        Se o item já foi vendido ou faz parte de um combo, o sistema recusa a exclusão.
+        Nesse caso, <a href="{% url 'cardapio:editar_prato' prato.pk %}">marque o item como indisponível</a>:
+        ele sai do PDV e do cardápio, mas o histórico de vendas continua correto.
     </p>
 
     <form method="post">
         {% csrf_token %}
         <div class="acoes">
-            <button type="submit" class="botao">Sim, excluir</button>
-            <a href="{% url 'cardapio:lista_pratos' %}" class="botao claro">Voltar</a>
+            <button type="submit" class="botao perigo">Excluir item</button>
+            <a href="{% url 'cardapio:lista_pratos' %}" class="botao claro">Manter item</a>
         </div>
     </form>
 </div>

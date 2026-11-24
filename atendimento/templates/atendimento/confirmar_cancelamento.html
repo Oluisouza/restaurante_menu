@@ -1,25 +1,30 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Cancelar {{ comanda.codigo }} — Comanda Digital{% endblock %}
+{% block titulo %}Cancelar {{ comanda.codigo }} | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>Cancelar comanda</h2>
+<a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="voltar">Voltar à comanda</a>
+<div class="topo">
+    <div>
+        <h2>Cancelar comanda</h2>
+        <p class="subtitulo"><span class="codigo">{{ comanda.codigo }}</span>, {{ comanda.responsavel|default:"sem nome" }}</p>
+    </div>
+</div>
 
 <div class="form-box">
     <p>
-        Você está prestes a cancelar a comanda <strong>{{ comanda.codigo }}</strong>
-        {% if comanda.mesa %}da {{ comanda.mesa }}{% endif %}
-        ({{ comanda.responsavel|default:"sem nome" }}),
-        com {{ comanda.itens_validos.count }} item{{ comanda.itens_validos.count|pluralize:"ns" }}
-        e total de R$ {{ comanda.total|floatformat:2 }}.
+        A comanda {% if comanda.mesa %}da {{ comanda.mesa }} {% endif %}tem
+        {{ comanda.itens_validos.count }} ite{{ comanda.itens_validos.count|pluralize:"m,ns" }}
+        e total de <strong>R$ {{ comanda.total|floatformat:2 }}</strong>.
+        Cancelada, ela sai do faturamento e não aceita mais lançamentos.
     </p>
-    <p><strong>Esta ação não pode ser desfeita.</strong></p>
+    <p class="alerta perigo">Esta ação não pode ser desfeita.</p>
 
     <form method="post">
         {% csrf_token %}
         <div class="acoes">
-            <button type="submit" class="botao">Sim, cancelar comanda</button>
-            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Voltar</a>
+            <button type="submit" class="botao perigo">Cancelar comanda</button>
+            <a href="{% url 'atendimento:detalhe_comanda' comanda.pk %}" class="botao claro">Manter comanda</a>
         </div>
     </form>
 </div>

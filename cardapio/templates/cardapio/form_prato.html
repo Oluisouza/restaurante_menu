@@ -1,16 +1,21 @@
 {% extends 'base.html' %}
 
-{% block titulo %}{% if prato %}Editar{% else %}Novo{% endif %} item — Comanda Digital{% endblock %}
+{% block titulo %}{% if prato %}Editar{% else %}Novo{% endif %} item | Comanda Digital{% endblock %}
 
 {% block conteudo %}
-<h2>{% if prato %}Editar {{ prato.nome }}{% else %}Novo item do cardápio{% endif %}</h2>
+<a href="{% url 'cardapio:lista_pratos' %}" class="voltar">Voltar ao cardápio</a>
+<div class="topo">
+    <div>
+        <h2>{% if prato %}Editar {{ prato.nome }}{% else %}Novo item do cardápio{% endif %}</h2>
+    </div>
+</div>
 
 <div class="form-box">
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {{ form.as_p }}
         <div class="acoes">
-            <button type="submit" class="botao">Salvar</button>
+            <button type="submit" class="botao">{% if prato %}Salvar alterações{% else %}Cadastrar item{% endif %}</button>
             <a href="{% url 'cardapio:lista_pratos' %}" class="botao claro">Cancelar</a>
         </div>
     </form>
