@@ -106,3 +106,24 @@ Com um único operador isso era teórico. Com uma API aberta a vários clientes,
 | FKs sem `related_name` e classes CSS com nome semanticamente errado | De passagem, ao alterar esses arquivos |
 | `ALLOWED_HOSTS` vazio | Aula 19, implantação |
 | Ausência de autenticação e papéis | É um dos pilares da própria P2 (Aula 15) |
+
+
+---
+
+## Situação na entrega da P2
+
+| Item | Situação | Commits |
+|---|---|---|
+| 1. Cancelar item pela cozinha gera erro 500 | Resolvido. A cozinha cancela pela máquina de estados do model, que exige motivo. Tela de cancelamento com motivo, e o item cancelado aparece riscado na comanda. | `15fd5a2`, `f2b49f5` |
+| 2. Regras de negócio que só existem nas views | Resolvido. `mudar_status`, `exigir_alteravel`, `remover` e `lancar` vivem no model e são usados pelas views, pela API e pelo Admin. | `15fd5a2`, `b8d43c5`, `7d12ac1` |
+| 3. Preço maior que zero só no formulário | Resolvido. A constraint do banco passou a exigir `preco > 0`. | `7a44d09` |
+| 4. Unicidade global | Resolvido. Nomes únicos por restaurante, ignorando maiúsculas. | `766a30b` |
+| 5. Sem controle de concorrência | Em aberto. Registrado nas limitações do README. | |
+
+| Ponto fora da lista | Situação |
+|---|---|
+| Consultas N+1 | Resolvido na lista de comandas e no salão, e travado com `assertNumQueries` (`cf8931e`). A paginação continua em aberto. |
+| Classes CSS com nome errado | Resolvido no novo visual (`8ffc1f3`): as etiquetas usam o próprio status como classe. |
+| FKs sem `related_name` | Em aberto. |
+| `ALLOWED_HOSTS` vazio | Em aberto, fica para a implantação. |
+| Ausência de autenticação e papéis | Resolvido: login obrigatório (`85547ae`) e papéis de gerente e atendente (`eab6543`, `b504bfb`, `9be1ff6`). |
