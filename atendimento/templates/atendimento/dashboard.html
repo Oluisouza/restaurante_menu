@@ -9,9 +9,11 @@
         <h2>Dashboard</h2>
         <p class="subtitulo">Comandas fechadas de {{ inicio|date:"d/m/Y" }} a {{ fim|date:"d/m/Y" }}</p>
     </div>
+    {% if eh_gerente %}
     <div class="acoes">
         <a href="{% url 'atendimento:exportar_csv' %}?inicio={{ inicio|date:'Y-m-d' }}&fim={{ fim|date:'Y-m-d' }}" class="botao claro">Exportar CSV</a>
     </div>
+    {% endif %}
 </div>
 
 <form class="filtros" method="get">
@@ -47,8 +49,10 @@
     </div>
 </div>
 
+{% if eh_gerente %}
 <h3>Faturamento por dia</h3>
 <div class="grafico"><canvas id="grafico-faturamento" aria-label="Gráfico do faturamento por dia" role="img"></canvas></div>
+{% endif %}
 
 <div class="duas-colunas">
     <section>
@@ -87,7 +91,9 @@
     </section>
 </div>
 
+{% if eh_gerente %}
 {{ serie|json_script:"dados-serie" }}
 <script src="{% static 'js/chart.umd.min.js' %}"></script>
 <script src="{% static 'js/dashboard.js' %}"></script>
+{% endif %}
 {% endblock %}

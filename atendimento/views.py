@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from datetime import date, timedelta
 
-from core.utils import restaurante_atual
+from core.utils import gerente_requerido, restaurante_atual
 
 from . import dashboard
 from .forms import CancelarItemForm, ComandaForm, ItemComandaForm, FechamentoForm, PersonalizarItemForm, PeriodoForm
@@ -365,15 +365,18 @@ def _periodo(request):
 def painel(request):
     form, inicio, fim = _periodo(request)
     fechadas = dashboard.comandas_fechadas(restaurante_atual(request), inicio, fim)
+    eh_gerente = request.user.perfil.eh_gerente
     contexto = {
         'form': form,
         'inicio': inicio,
         'fim': fim,
+        'eh_gerente': eh_gerente,
         'indicadores': dashboard.indicadores(fechadas),
         'mais_vendidos': dashboard.mais_vendidos(fechadas),
         'por_pagamento': dashboard.por_pagamento(fechadas),
-        'serie': dashboard.serie_diaria(fechadas, inicio, fim),
     }
+    if eh_gerente:  # o atendente vê os números do período, sem a série e sem exportar
+        contexto['serie'] = dashboard.serie_diaria(fechadas, inicio, fim)
     return render(request, 'atendimento/dashboard.html', contexto)
 
 def _celula_segura(texto):
@@ -385,7 +388,7 @@ def _celula_segura(texto):
 def _reais(valor):
     return f'{valor:.2f}'.replace('.', ',')
 
-
+@gerente_requerido
 def exportar_csv(request):
     _, inicio, fim = _periodo(request)
     fechadas = (

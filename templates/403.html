@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Acesso negado | Comanda Digital{% endblock %}
+
+{% block conteudo %}
+<div class="entrada">
+    <div class="form-box">
+        <h2>Acesso negado</h2>
+        <p>{{ exception|default:"Você não tem permissão para abrir esta página." }}</p>
+        <p class="subtitulo">Se precisar deste acesso, fale com o gerente do restaurante.</p>
+        <div class="acoes">
+            <a href="{% url 'atendimento:salao' %}" class="botao">Voltar ao salão</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

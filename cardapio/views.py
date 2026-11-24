@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.db.models import ProtectedError, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from core.utils import restaurante_atual
+from core.utils import gerente_requerido, restaurante_atual
 
 from .forms import PratoForm
 from .models import Categoria, Combo, Prato
@@ -55,6 +55,7 @@ def lista_cardapio(request):
     }
     return render(request, 'cardapio/lista_cardapio.html', contexto)
 
+@gerente_requerido
 def lista_pratos(request):
     restaurante = restaurante_atual(request)
     pratos, busca, categoria_id = filtrar_pratos(
@@ -68,6 +69,7 @@ def lista_pratos(request):
     }
     return render(request, 'cardapio/lista_pratos.html', contexto)
 
+@gerente_requerido
 def form_prato(request, pk=None):
     restaurante = restaurante_atual(request)
     prato = get_object_or_404(Prato, pk=pk, restaurante=restaurante) if pk else None
@@ -84,6 +86,7 @@ def form_prato(request, pk=None):
 
     return render(request, 'cardapio/form_prato.html', {'form': form, 'prato': prato})
 
+@gerente_requerido
 def excluir_prato(request, pk):
     prato = get_object_or_404(Prato, pk=pk, restaurante=restaurante_atual(request))
 
@@ -95,7 +98,7 @@ def excluir_prato(request, pk):
             messages.error(
                 request,
                 f'{nome} não pode ser excluído porque já foi usado em comandas '
-                f'ou comboas. Marque como indisponível. ',
+                f'ou combos. Marque como indisponível.',
             )
         else:
             messages.success(request, f'{nome} excluído do cardápio')
