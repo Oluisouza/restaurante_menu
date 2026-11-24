@@ -147,12 +147,14 @@ class CancelarItemForm(forms.Form):
     )
 
 class PeriodoForm(forms.Form):
+    DIAS_MAXIMOS = 366
+
     inicio = forms.DateField(
-        label='De', required=False,
+        label='De',
         widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
     )
     fim = forms.DateField(
-        label='Até', required=False,
+        label='Até',
         widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
     )
 
@@ -161,4 +163,6 @@ class PeriodoForm(forms.Form):
         inicio, fim = dados.get('inicio'), dados.get('fim')
         if inicio and fim and inicio > fim:
             self.add_error('fim', 'A data final não pode ser anterior à inicial.')
+        elif inicio and fim and (fim - inicio).days >= self.DIAS_MAXIMOS:
+            self.add_error('fim', 'O período máximo é de um ano.')
         return dados

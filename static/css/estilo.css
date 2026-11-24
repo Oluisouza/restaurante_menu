@@ -457,3 +457,5 @@ button {
 .cartao strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
 .duas-colunas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
 form.filtros { align-items: center; flex-wrap: wrap; }
+
+.grafico { background: #fff; border-radius: 8px; padding: 1rem; height: 280px; margin-bottom: 1.5rem; }

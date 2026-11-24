@@ -897,9 +897,28 @@ class DashboardTest(TesteComRestaurante):
         self.assertContains(resposta, 'Nenhuma venda no período')
 
     def test_periodo_invalido_volta_ao_padrao_com_aviso(self):
-        for dados in ({'inicio': 'abc'}, {'inicio': '2026-03-10', 'fim': '2026-03-01'}):
+        for dados in (
+            {'inicio': 'abc'},
+            {'inicio': '2026-03-10', 'fim': '2026-03-01'},
+            {'inicio': '2024-01-01', 'fim': '2026-01-01'},
+            {'inicio': '2026-03-01'},
+        ):
             with self.subTest(dados=dados):
                 resposta = self.client.get(self.url, dados)
                 self.assertEqual(resposta.status_code, 200)
                 self.assertTrue(resposta.context['form'].errors)
                 self.assertEqual(resposta.context['indicadores']['quantidade'], 2)
+
+    def test_serie_tem_todos_os_dias_do_periodo(self):
+        serie = self.client.get(self.url).context['serie']
+        hoje = timezone.localdate()
+        por_dia = {ponto['dia']: ponto['total'] for ponto in serie}
+        self.assertEqual(len(serie), 30)
+        self.assertEqual(por_dia[hoje.strftime('%d/%m')], Decimal('12.00'))
+        self.assertEqual(por_dia[(hoje - timedelta(days=5)).strftime('%d/%m')], Decimal('18.00'))
+        self.assertEqual(sum(1 for ponto in serie if ponto['total']), 2)
+
+    def test_grafico_recebe_os_dados_em_json(self):
+        resposta = self.client.get(self.url)
+        self.assertContains(resposta, 'id="dados-serie"')
+        self.assertContains(resposta, 'js/dashboard.js')

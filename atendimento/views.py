@@ -362,6 +362,7 @@ def painel(request):
         'indicadores': dashboard.indicadores(fechadas),
         'mais_vendidos': dashboard.mais_vendidos(fechadas),
         'por_pagamento': dashboard.por_pagamento(fechadas),
+        'serie': dashboard.serie_diaria(fechadas, inicio, fim),
     }
     return render(request, 'atendimento/dashboard.html', contexto)
 

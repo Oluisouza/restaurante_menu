@@ -1,3 +1,6 @@
+from datetime import timedelta
+from decimal import Decimal
+
 from django.db.models import Avg, Count, Sum
 from django.db.models.functions import TruncDate
 
@@ -56,3 +59,10 @@ def faturamento_por_dia(fechadas):
         .annotate(total=Sum('total_pago'), quantidade=Count('id'))
         .order_by('dia')
     )
+
+
+def serie_diaria(fechadas, inicio, fim):
+    """A série pronta para o gráfico: todos os dias do período, inclusive os sem venda."""
+    por_dia = {linha['dia']: linha['total'] for linha in faturamento_por_dia(fechadas)}
+    dias = (inicio + timedelta(days=n) for n in range((fim - inicio).days + 1))
+    return [{'dia': dia.strftime('%d/%m'), 'total': por_dia.get(dia, Decimal('0'))} for dia in dias]
