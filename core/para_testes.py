@@ -4,19 +4,19 @@ from django.test import TestCase
 from .models import Perfil, Restaurante
 
 
-def criar_usuario(username, restaurante):
+def criar_usuario(username, restaurante, papel=Perfil.Papel.GERENTE):
     usuario = User.objects.create_user(username, password='senha-teste')
-    Perfil.objects.create(usuario=usuario, restaurante=restaurante)
+    Perfil.objects.create(usuario=usuario, restaurante=restaurante, papel=papel)
     return usuario
 
 
 class TesteComRestaurante(TestCase):
-    """Base dos testes: um restaurante e um usuário logado com perfil nele."""
+    """Base dos testes: um restaurante e um gerente logado nele."""
 
     @classmethod
     def setUpTestData(cls):
         cls.restaurante = Restaurante.objects.create(nome='Restaurante Teste')
-        cls.usuario = criar_usuario('atendente', cls.restaurante)
+        cls.usuario = criar_usuario('gerente', cls.restaurante)
 
     def setUp(self):
         self.client.force_login(self.usuario)

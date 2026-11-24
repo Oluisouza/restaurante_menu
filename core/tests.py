@@ -33,10 +33,10 @@ class EntrarESairTest(TesteComRestaurante):
 
     def test_login_leva_ao_salao_e_logout_volta_ao_login(self):
         resposta = self.client.post(
-            reverse('login'), {'username': 'atendente', 'password': 'senha-teste'}
+            reverse('login'), {'username': 'gerente', 'password': 'senha-teste'}
         )
         self.assertRedirects(resposta, reverse('atendimento:salao'))
-        self.assertContains(self.client.get(reverse('atendimento:salao')), 'atendente')
+        self.assertContains(self.client.get(reverse('atendimento:salao')), 'gerente')
 
         self.assertRedirects(self.client.post(reverse('logout')), reverse('login'))
         self.assertEqual(self.client.get(reverse('atendimento:salao')).status_code, 302)

@@ -11,5 +11,5 @@ class RestauranteAdmin(admin.ModelAdmin):
 
 @admin.register(Perfil)
 class PerfilAdmin(admin.ModelAdmin):
-    list_display = ('usuario', 'restaurante')
-    list_filter = ('restaurante',)
+    list_display = ('usuario', 'restaurante', 'papel')
+    list_filter = ('restaurante', 'papel')
