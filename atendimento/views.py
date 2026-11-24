@@ -1,7 +1,9 @@
+import csv
+
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, render, redirect
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.db.models import Prefetch
 from django.utils import timezone
 
@@ -365,6 +367,43 @@ def painel(request):
         'serie': dashboard.serie_diaria(fechadas, inicio, fim),
     }
     return render(request, 'atendimento/dashboard.html', contexto)
+
+def _celula_segura(texto):
+    """O Excel trata como fórmula a célula que começa com = + - @. Um apóstrofo desarma."""
+    texto = str(texto)
+    return f"'{texto}" if texto[:1] in ('=', '+', '-', '@') else texto
+
+
+def _reais(valor):
+    return f'{valor:.2f}'.replace('.', ',')
+
+
+def exportar_csv(request):
+    _, inicio, fim = _periodo(request)
+    fechadas = (
+        dashboard.comandas_fechadas(restaurante_atual(request), inicio, fim)
+        .select_related('mesa')
+        .order_by('fechada_em')
+    )
+
+    resposta = HttpResponse(content_type='text/csv; charset=utf-8')
+    resposta['Content-Disposition'] = f'attachment; filename="comandas_{inicio}_a_{fim}.csv"'
+    resposta.write('\ufeff')  # BOM: avisa ao Excel que o arquivo é UTF-8
+
+    planilha = csv.writer(resposta, delimiter=';')
+    planilha.writerow(['Código', 'Fechada em', 'Tipo', 'Mesa', 'Responsável', 'Pagamento', 'Desconto', 'Total pago'])
+    for comanda in fechadas:
+        planilha.writerow([
+            comanda.codigo,
+            timezone.localtime(comanda.fechada_em).strftime('%d/%m/%Y %H:%M'),
+            comanda.get_tipo_display(),
+            comanda.mesa.identificacao if comanda.mesa else '',
+            _celula_segura(comanda.responsavel),
+            comanda.get_forma_pagamento_display(),
+            _reais(comanda.desconto),
+            _reais(comanda.total_pago),
+        ])
+    return resposta
 
 def cancelar_item(request, pk):
     item = _item_do_restaurante(request, pk)

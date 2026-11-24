@@ -1,3 +1,5 @@
+import csv
+import io
 from datetime import timedelta
 from decimal import Decimal
 
@@ -922,3 +924,24 @@ class DashboardTest(TesteComRestaurante):
         resposta = self.client.get(self.url)
         self.assertContains(resposta, 'id="dados-serie"')
         self.assertContains(resposta, 'js/dashboard.js')
+
+    def _linhas_do_csv(self, resposta):
+        return list(csv.reader(io.StringIO(resposta.content.decode('utf-8-sig')), delimiter=';'))
+
+    def test_csv_tem_o_periodo_e_o_restaurante_certos(self):
+        resposta = self.client.get(reverse('atendimento:exportar_csv'))
+        self.assertEqual(resposta['Content-Type'], 'text/csv; charset=utf-8')
+        self.assertIn('attachment;', resposta['Content-Disposition'])
+        self.assertTrue(resposta.content.startswith('\ufeff'.encode('utf-8')))
+        linhas = self._linhas_do_csv(resposta)
+        self.assertEqual(linhas[0][0], 'Código')
+        self.assertEqual([linha[-1] for linha in linhas[1:]], ['18,00', '12,00'])
+
+    def test_csv_desarma_formula_no_nome_do_cliente(self):
+        comanda = Comanda.objects.create(
+            restaurante=self.restaurante, tipo=Comanda.Tipo.VIAGEM, responsavel='=HYPERLINK("http://golpe")'
+        )
+        ItemComanda.objects.create(comanda=comanda, prato=self.espresso)
+        comanda.fechar(Comanda.FormaPagamento.PIX)
+        responsaveis = [linha[4] for linha in self._linhas_do_csv(self.client.get(reverse('atendimento:exportar_csv')))]
+        self.assertIn('\'=HYPERLINK("http://golpe")', responsaveis)

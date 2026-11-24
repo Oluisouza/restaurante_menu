@@ -12,6 +12,7 @@
     {{ form.fim.label_tag }} {{ form.fim }}
     <button type="submit">Filtrar</button>
     <a href="{% url 'atendimento:dashboard' %}" class="botao claro">Últimos 30 dias</a>
+    <a href="{% url 'atendimento:exportar_csv' %}?inicio={{ inicio|date:'Y-m-d' }}&fim={{ fim|date:'Y-m-d' }}" class="botao">Exportar CSV</a>
 </form>
 {% if form.errors %}
 <ul class="avisos">
